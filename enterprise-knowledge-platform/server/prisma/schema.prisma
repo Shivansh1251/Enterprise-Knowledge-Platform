@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String               @id @default(cuid())
+  email        String               @unique
+  passwordHash String               @map("password_hash")
+  name         String
+  createdAt    DateTime             @default(now()) @map("created_at")
+  memberships  OrganizationMember[]
+  documents    Document[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String               @id @default(cuid())
+  name      String
+  createdAt DateTime             @default(now()) @map("created_at")
+  members   OrganizationMember[]
+  documents Document[]
+  auditLogs AuditLog[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  userId         String       @map("user_id")
+  role           MemberRole   @default(MEMBER)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+enum MemberRole {
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+model Document {
+  id             String          @id @default(cuid())
+  organizationId String          @map("organization_id")
+  uploadedBy     String          @map("uploaded_by")
+  name           String
+  mimeType       String          @map("mime_type")
+  storagePath    String          @map("storage_path")
+  status         DocumentStatus  @default(UPLOADED)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploader       User            @relation(fields: [uploadedBy], references: [id])
+  chunks         DocumentChunk[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+model DocumentChunk {
+  id             String                    @id @default(cuid())
+  documentId     String                    @map("document_id")
+  chunkIndex     Int                       @map("chunk_index")
+  content        String
+  pageNumber     Int?                      @map("page_number")
+  metadata       Json?
+  embedding      Unsupported("vector(1536)")?
+  embeddingModel String?                   @map("embedding_model")
+  document       Document                  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([embeddingModel])
+  @@map("document_chunks")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String?      @map("organization_id")
+  userId         String?      @map("user_id")
+  action         String
+  resource       String?
+  resourceId     String?      @map("resource_id")
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("audit_logs")
+}

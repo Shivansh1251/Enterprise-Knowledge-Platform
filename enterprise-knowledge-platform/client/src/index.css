@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #faf9f7;
+  --bg-card: #ffffff;
+  --bg-hover: #f5f3ef;
+  --border: #e8e3db;
+  --border-light: #f0ece5;
+  --text-primary: #1a1714;
+  --text-secondary: #6b6560;
+  --text-muted: #9e9792;
+  --accent-green: #2d9d6e;
+  --accent-green-light: #e8f7f1;
+  --accent-amber: #d97706;
+  --accent-amber-light: #fef3c7;
+  --accent-red: #dc2626;
+  --accent-red-light: #fee2e2;
+  --accent-blue: #2563eb;
+  --accent-blue-light: #eff6ff;
+  --shadow-sm: 0 1px 3px rgba(26, 23, 20, 0.06);
+  --shadow-md: 0 4px 12px rgba(26, 23, 20, 0.08);
+  --shadow-lg: 0 8px 32px rgba(26, 23, 20, 0.10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
