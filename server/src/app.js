@@ -3,27 +3,67 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const fs = require('fs');
+const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
 const searchRoutes = require('./routes/search');
 const { errorHandler } = require('./middleware/errorHandler');
+const prisma = require('./lib/prisma');
 
 const app = express();
 
+if (process.env.NODE_ENV === 'production'
+    && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || /replace-with/i.test(process.env.JWT_SECRET))) {
+    throw new Error('Production requires a private JWT_SECRET with at least 32 characters.');
+}
+
+const allowedOrigins = (process.env.CLIENT_ORIGINS
+    || 'http://localhost:5173,http://127.0.0.1:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 // ── Security & logging ────────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('Origin is not allowed by CORS'));
+    },
+    credentials: true,
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/ready', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        return res.json({ status: 'ready', database: 'ok' });
+    } catch {
+        return res.status(503).json({ status: 'not_ready', database: 'unavailable' });
+    }
+});
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/search', searchRoutes);
+
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(clientDistPath)) {
+    app.use(express.static(clientDistPath, { index: false, maxAge: '1y', immutable: true }));
+    app.get(/^(?!\/api(?:\/|$)|\/health$).*/, (req, res, next) => {
+        if (req.method !== 'GET') return next();
+        res.setHeader('Cache-Control', 'no-cache');
+        return res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+            if (err) next(err);
+        });
+    });
+}
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use(errorHandler);

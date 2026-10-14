@@ -5,7 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { upload, list, getOne, remove } = require('../controllers/documentController');
 const { authenticate } = require('../middleware/auth');
-const { AppError } = require('../utils/errors');
+const { AppError, sendError } = require('../utils/errors');
 
 const router = express.Router();
 
@@ -59,9 +59,16 @@ const uploadMiddleware = multer({
 
 router.use(authenticate);
 
-router.post('/', uploadMiddleware.single('file'), upload);
+const requireDemoAdminForWrites = (req, res, next) => {
+    if (req.demoRole === 'guest') {
+        return sendError(res, 'DEMO_GUEST_READ_ONLY', 'Guest demo access is read-only', 403);
+    }
+    return next();
+};
+
+router.post('/', requireDemoAdminForWrites, uploadMiddleware.single('file'), upload);
 router.get('/', list);
 router.get('/:id', getOne);
-router.delete('/:id', remove);
+router.delete('/:id', requireDemoAdminForWrites, remove);
 
 module.exports = router;

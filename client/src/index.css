@@ -2,6 +2,12 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+  --hank-ink: #1d2b22;
+  --hank-green: #08743e;
+  --hank-green-deep: #075e35;
+  --hank-cream: #fffaf0;
+  --hank-mint: #e8f0df;
   --bg-primary: #faf9f7;
   --bg-card: #ffffff;
   --bg-hover: #f5f3ef;
@@ -41,4 +47,36 @@ body {
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(24, 126, 67, 0.42);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: #153521;
+  background: #c8e4cb;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

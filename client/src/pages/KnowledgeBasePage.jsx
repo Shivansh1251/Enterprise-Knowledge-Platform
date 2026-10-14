@@ -1,290 +1,284 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import api from '../lib/api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-    FileText, Trash2, CheckCircle2, Clock, AlertCircle,
-    Loader2, RefreshCw, FileUp, Calendar, User
+    AlertCircle, BookOpen, Check, CheckCircle2, Clock3, FileText, FileUp,
+    LoaderCircle, RefreshCw, Search, ShieldCheck, Trash2, UploadCloud, X,
 } from 'lucide-react'
+import api from '../lib/api'
+import { useAuth } from '../context/useAuth'
+import './KnowledgeBasePage.css'
 
-const STATUS_CONFIG = {
-    READY: { label: 'Ready', color: 'var(--accent-green)', bg: 'var(--accent-green-light)', icon: CheckCircle2 },
-    PROCESSING: { label: 'Processing', color: 'var(--accent-amber)', bg: 'var(--accent-amber-light)', icon: Clock },
-    UPLOADED: { label: 'Uploaded', color: 'var(--accent-blue)', bg: 'var(--accent-blue-light)', icon: Clock },
-    FAILED: { label: 'Failed', color: 'var(--accent-red)', bg: 'var(--accent-red-light)', icon: AlertCircle },
+const STATUS = {
+    READY: { label: 'Ready', Icon: CheckCircle2 },
+    PROCESSING: { label: 'Indexing', Icon: Clock3 },
+    UPLOADED: { label: 'Queued', Icon: Clock3 },
+    FAILED: { label: 'Failed', Icon: AlertCircle },
 }
+const MAX_FILE_SIZE = 25 * 1024 * 1024
 
 function StatusBadge({ status }) {
-    const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.UPLOADED
-    const Icon = cfg.icon
+    const { label, Icon } = STATUS[status] || STATUS.UPLOADED
+    return <span className={`kb-status kb-status-${status.toLowerCase()}`}><Icon size={13} />{label}</span>
+}
+
+function formatDate(value) {
+    if (!value) return 'Date unavailable'
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? 'Date unavailable' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date)
+}
+
+function DeleteDialog({ document, onCancel, onConfirm, deleting }) {
+    const dialogRef = useRef(null)
+    const cancelButtonRef = useRef(null)
+
+    useEffect(() => {
+        if (!document) return undefined
+        const previousFocus = window.document.activeElement
+        const previousOverflow = window.document.body.style.overflow
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && !deleting) {
+                onCancel()
+                return
+            }
+            if (event.key !== 'Tab') return
+            const focusable = dialogRef.current?.querySelectorAll('button:not(:disabled)')
+            if (!focusable?.length) return
+            const first = focusable[0]
+            const last = focusable[focusable.length - 1]
+            if (event.shiftKey && window.document.activeElement === first) {
+                event.preventDefault()
+                last.focus()
+            } else if (!event.shiftKey && window.document.activeElement === last) {
+                event.preventDefault()
+                first.focus()
+            }
+        }
+        window.document.body.style.overflow = 'hidden'
+        window.document.addEventListener('keydown', handleKeyDown)
+        cancelButtonRef.current?.focus()
+        return () => {
+            window.document.body.style.overflow = previousOverflow
+            window.document.removeEventListener('keydown', handleKeyDown)
+            if (previousFocus instanceof HTMLElement) previousFocus.focus()
+        }
+    }, [document, deleting, onCancel])
+
+    if (!document) return null
     return (
-        <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
-            color: cfg.color, background: cfg.bg,
-        }}>
-            <Icon size={11} />
-            {cfg.label}
-        </span>
+        <div className="kb-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) onCancel() }}>
+            <section ref={dialogRef} className="kb-dialog" role="alertdialog" aria-modal="true" aria-labelledby="kb-delete-title" aria-describedby="kb-delete-copy">
+                <div className="kb-dialog-icon"><Trash2 size={19} /></div>
+                <button className="kb-dialog-close" type="button" onClick={onCancel} disabled={deleting} aria-label="Close confirmation"><X size={17} /></button>
+                <h2 id="kb-delete-title">Remove this document?</h2>
+                <p id="kb-delete-copy"><strong>{document.name}</strong> and its indexed passages will be removed from this workspace.</p>
+                <div className="kb-dialog-actions">
+                    <button ref={cancelButtonRef} type="button" className="kb-button kb-button-secondary" onClick={onCancel} disabled={deleting}>Keep document</button>
+                    <button type="button" className="kb-button kb-button-danger" onClick={onConfirm} disabled={deleting}>{deleting ? <LoaderCircle size={15} className="kb-spin" /> : <Trash2 size={15} />}{deleting ? 'Removing…' : 'Remove document'}</button>
+                </div>
+            </section>
+        </div>
     )
 }
 
 export default function KnowledgeBasePage() {
+    const { demoRole } = useAuth()
+    const readOnlyGuest = demoRole === 'guest'
     const [documents, setDocuments] = useState([])
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
     const [uploading, setUploading] = useState(false)
-    const [uploadProgress, setUploadProgress] = useState('')
+    const [uploadProgress, setUploadProgress] = useState(0)
     const [error, setError] = useState('')
+    const [notice, setNotice] = useState('')
     const [dragOver, setDragOver] = useState(false)
-    const fileInputRef = useRef()
+    const [filter, setFilter] = useState('All')
+    const [searchTerm, setSearchTerm] = useState('')
+    const [pendingDelete, setPendingDelete] = useState(null)
+    const [deleting, setDeleting] = useState(false)
+    const fileInputRef = useRef(null)
+    const cancelDelete = useCallback(() => {
+        if (!deleting) setPendingDelete(null)
+    }, [deleting])
 
     const fetchDocuments = useCallback(async () => {
         try {
             const { data } = await api.get('/documents')
-            setDocuments(data.documents)
+            setDocuments(Array.isArray(data.documents) ? data.documents : [])
             setError('')
         } catch (err) {
-            setError(err.response?.data?.error?.message || 'Failed to load documents')
+            setError(err.response?.data?.error?.message || 'Could not load documents. Check your connection and try again.')
         } finally {
             setLoading(false)
         }
     }, [])
 
-    useEffect(() => {
-        void fetchDocuments()
-    }, [fetchDocuments])
+    const refreshDocuments = async () => {
+        setRefreshing(true)
+        await fetchDocuments()
+        setRefreshing(false)
+    }
 
     useEffect(() => {
-        const hasPendingDocuments = documents.some(
-            (document) => document.status === 'PROCESSING' || document.status === 'UPLOADED',
-        )
+        let active = true
+        api.get('/documents')
+            .then(({ data }) => {
+                if (!active) return
+                setDocuments(Array.isArray(data.documents) ? data.documents : [])
+                setError('')
+            })
+            .catch((err) => {
+                if (active) setError(err.response?.data?.error?.message || 'Could not load documents. Check your connection and try again.')
+            })
+            .finally(() => { if (active) setLoading(false) })
+        return () => { active = false }
+    }, [])
+
+    useEffect(() => {
+        const hasPendingDocuments = documents.some((document) => ['PROCESSING', 'UPLOADED'].includes(document.status))
         if (!hasPendingDocuments) return undefined
-
-        const interval = setInterval(() => void fetchDocuments(), 3000)
-        return () => clearInterval(interval)
+        const interval = window.setInterval(() => void fetchDocuments(), 3000)
+        return () => window.clearInterval(interval)
     }, [documents, fetchDocuments])
 
     const handleUpload = async (file) => {
-        if (!file) return
-        setUploading(true)
-        setError('')
-        setUploadProgress('Uploading...')
+        if (!file || uploading) return
+        const extension = file.name.split('.').pop()?.toLowerCase()
+        if (!['pdf', 'txt'].includes(extension)) {
+            setError('Choose a PDF or TXT file to add to your knowledge base.')
+            return
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            setError('This file is larger than 25 MB. Choose a smaller file and try again.')
+            return
+        }
 
+        setError('')
+        setNotice('')
+        setUploading(true)
+        setUploadProgress(0)
         const form = new FormData()
         form.append('file', file)
 
         try {
-            setUploadProgress('Uploading file...')
             await api.post('/documents', form, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: ({ loaded, total }) => {
+                    if (total) setUploadProgress(Math.min(100, Math.round((loaded / total) * 100)))
+                },
             })
-            setUploadProgress('Processing document...')
-            await new Promise((r) => setTimeout(r, 500))
+            setNotice(`${file.name} uploaded. Hank is indexing it now.`)
             await fetchDocuments()
         } catch (err) {
-            setError(err.response?.data?.error?.message || 'Upload failed')
+            setError(err.response?.data?.error?.message || 'Upload failed. Check the file and try again.')
         } finally {
             setUploading(false)
-            setUploadProgress('')
+            setUploadProgress(0)
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
 
-    const handleDelete = async (id) => {
-        if (!confirm('Delete this document and all its chunks?')) return
+    const confirmDelete = async () => {
+        if (!pendingDelete || deleting) return
+        setDeleting(true)
+        setError('')
         try {
-            await api.delete(`/documents/${id}`)
-            setDocuments((prev) => prev.filter((d) => d.id !== id))
+            await api.delete(`/documents/${pendingDelete.id}`)
+            setDocuments((current) => current.filter((document) => document.id !== pendingDelete.id))
+            setNotice(`${pendingDelete.name} was removed from the knowledge base.`)
+            setPendingDelete(null)
         } catch (err) {
-            setError(err.response?.data?.error?.message || 'Delete failed')
+            setError(err.response?.data?.error?.message || 'Could not remove this document. Please try again.')
+        } finally {
+            setDeleting(false)
         }
     }
 
-    const handleDrop = (e) => {
-        e.preventDefault()
-        setDragOver(false)
-        const file = e.dataTransfer.files[0]
-        if (file) handleUpload(file)
-    }
+    const counts = useMemo(() => ({
+        total: documents.length,
+        ready: documents.filter((document) => document.status === 'READY').length,
+        processing: documents.filter((document) => ['PROCESSING', 'UPLOADED'].includes(document.status)).length,
+    }), [documents])
+
+    const visibleDocuments = useMemo(() => documents.filter((document) => {
+        const matchesSearch = document.name.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())
+        const matchesFilter = filter === 'All' || (filter === 'Ready' && document.status === 'READY') || (filter === 'Processing' && ['PROCESSING', 'UPLOADED'].includes(document.status)) || (filter === 'Failed' && document.status === 'FAILED')
+        return matchesSearch && matchesFilter
+    }), [documents, filter, searchTerm])
 
     return (
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
-            {/* Header */}
-            <div style={{ marginBottom: 32 }}>
-                <h1 style={{ margin: '0 0 6px', fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em' }}>
-                    Knowledge Base
-                </h1>
-                <p style={{ margin: 0, fontSize: 15, color: 'var(--text-secondary)' }}>
-                    Upload and manage your organization's documents
-                </p>
-            </div>
+        <div className="kb-page">
+            <header className="kb-page-heading">
+                <div>
+                    <div className="kb-eyebrow"><BookOpen size={14} /> HANK WORKSPACE</div>
+                    <h1>Knowledge base</h1>
+                    <p>Manage the documents Hank can search and cite in its answers.</p>
+                </div>
+                <div className="kb-heading-actions">
+                    <Link className="kb-button kb-button-secondary kb-ask-link" to="/"><BookOpen size={15} /> Ask Hank</Link>
+                    <button className="kb-button kb-button-secondary kb-refresh" type="button" onClick={() => void refreshDocuments()} disabled={refreshing}>
+                        <RefreshCw size={15} className={refreshing ? 'kb-spin' : ''} /> <span>{refreshing ? 'Refreshing' : 'Refresh'}</span>
+                    </button>
+                </div>
+            </header>
 
-            {/* Upload zone */}
-            <div
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => !uploading && fileInputRef.current?.click()}
-                style={{
-                    border: `2px dashed ${dragOver ? 'var(--accent-green)' : 'var(--border)'}`,
-                    borderRadius: 16,
-                    padding: '36px 24px',
-                    textAlign: 'center',
-                    background: dragOver ? 'var(--accent-green-light)' : '#fff',
-                    cursor: uploading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                    marginBottom: 28,
-                }}
-            >
-                <input
-                    id="file-upload"
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.txt"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleUpload(e.target.files[0])}
-                    disabled={uploading}
-                />
-                {uploading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                        <Loader2 size={32} color="var(--accent-green)" style={{ animation: 'spin 1s linear infinite' }} />
-                        <div>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--accent-green)' }}>{uploadProgress}</div>
-                            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                                Extracting text and indexing chunks…
-                            </div>
-                        </div>
+            <section className="kb-overview" aria-label="Knowledge base overview">
+                <div className="kb-overview-item"><span className="kb-overview-icon"><FileText size={17} /></span><span><strong>{counts.total}</strong><small>{counts.total === 1 ? 'Document' : 'Documents'}</small></span></div>
+                <div className="kb-overview-divider" />
+                <div className="kb-overview-item"><span className="kb-overview-icon ready"><Check size={17} /></span><span><strong>{counts.ready}</strong><small>Ready to search</small></span></div>
+                <div className="kb-overview-divider" />
+                <div className="kb-overview-item"><span className="kb-overview-icon processing"><Clock3 size={17} /></span><span><strong>{counts.processing}</strong><small>Being indexed</small></span></div>
+                {readOnlyGuest && <div className="kb-readonly-pill"><ShieldCheck size={14} /> Guest preview</div>}
+            </section>
+
+            {readOnlyGuest && <div className="kb-guest-note"><ShieldCheck size={16} /><span>This workspace is read-only in guest mode. You can search documents and open citations.</span></div>}
+
+            {!readOnlyGuest && <section className={`kb-upload-zone${dragOver ? ' is-dragging' : ''}${uploading ? ' is-uploading' : ''}`} aria-busy={uploading} onDragOver={(event) => { event.preventDefault(); setDragOver(true) }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragOver(false) }} onDrop={(event) => { event.preventDefault(); setDragOver(false); void handleUpload(event.dataTransfer.files[0]) }}>
+                <input ref={fileInputRef} className="kb-file-input" id="kb-file-upload" type="file" accept=".pdf,.txt,application/pdf,text/plain" onChange={(event) => void handleUpload(event.target.files?.[0])} disabled={uploading} />
+                <span className="kb-upload-icon">{uploading ? <LoaderCircle size={23} className="kb-spin" /> : <UploadCloud size={23} />}</span>
+                <div className="kb-upload-copy">
+                    <h2>{uploading ? `Uploading${uploadProgress ? ` · ${uploadProgress}%` : '…'}` : 'Add documents to Hank'}</h2>
+                    <p>{uploading ? 'Your file will be searchable once indexing is complete.' : 'Drop a PDF or TXT file here, or choose a file from your device.'}</p>
+                    {uploading && <div className="kb-progress" role="progressbar" aria-label="File upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadProgress}><span style={{ width: `${uploadProgress}%` }} /></div>}
+                    {!uploading && <span className="kb-upload-limit">PDF or TXT <i /> Up to 25 MB</span>}
+                </div>
+                <label className={`kb-button kb-button-primary${uploading ? ' is-disabled' : ''}`} htmlFor="kb-file-upload" aria-disabled={uploading}>
+                    <FileUp size={15} /> Browse files
+                </label>
+            </section>}
+
+            {error && <div className="kb-feedback kb-feedback-error" role="alert"><AlertCircle size={16} /><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={15} /></button></div>}
+            {notice && <div className="kb-feedback kb-feedback-success" role="status"><CheckCircle2 size={16} /><span>{notice}</span><button type="button" onClick={() => setNotice('')} aria-label="Dismiss message"><X size={15} /></button></div>}
+
+            <section className="kb-library" aria-labelledby="kb-library-title">
+                <div className="kb-library-heading">
+                    <div><h2 id="kb-library-title">Your documents</h2><p>Only ready documents are included in search results.</p></div>
+                    <label className="kb-search-field"><Search size={15} /><span className="kb-sr-only">Search documents</span><input type="search" placeholder="Find a document" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></label>
+                </div>
+                <div className="kb-list-toolbar">
+                    <div className="kb-filter-tabs" role="group" aria-label="Filter documents">
+                        {['All', 'Ready', 'Processing', 'Failed'].map((item) => <button key={item} type="button" aria-pressed={filter === item} className={filter === item ? 'selected' : ''} onClick={() => setFilter(item)}>{item}{item === 'All' ? ` ${counts.total}` : item === 'Ready' ? ` ${counts.ready}` : item === 'Processing' ? ` ${counts.processing}` : ''}</button>)}
                     </div>
+                </div>
+
+                {loading ? <div className="kb-loading"><LoaderCircle size={23} className="kb-spin" /><span>Loading your documents…</span></div> : error && documents.length === 0 ? (
+                    <div className="kb-empty kb-empty-error"><div className="kb-empty-icon"><AlertCircle size={22} /></div><h3>Couldn’t load the library</h3><p>Check that the API is running, then try again.</p><button className="kb-button kb-button-secondary" type="button" onClick={() => void refreshDocuments()}><RefreshCw size={14} /> Try again</button></div>
+                ) : visibleDocuments.length === 0 ? (
+                    <div className="kb-empty"><div className="kb-empty-icon"><FileText size={22} /></div><h3>{documents.length === 0 ? 'Your library is ready for its first document' : 'No documents match this view'}</h3><p>{documents.length === 0 ? (readOnlyGuest ? 'No sample documents are available in this workspace yet.' : 'Add a PDF or text file to give Hank something useful to search.') : 'Try a different search or filter.'}</p>{documents.length === 0 && !readOnlyGuest && <button type="button" className="kb-button kb-button-primary" onClick={() => fileInputRef.current?.click()}><FileUp size={15} /> Choose a document</button>}</div>
                 ) : (
-                    <>
-                        <div style={{
-                            width: 52, height: 52, borderRadius: 14,
-                            background: 'var(--accent-green-light)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            margin: '0 auto 14px',
-                        }}>
-                            <FileUp size={22} color="var(--accent-green)" />
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: 'var(--text-primary)' }}>
-                            Drop a file here or click to upload
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                            PDF or TXT · Up to 25 MB
-                        </div>
-                    </>
+                    <div className="kb-document-list" role="list">
+                        {visibleDocuments.map((document) => {
+                            return <article className="kb-document-row" role="listitem" key={document.id}>
+                                <span className="kb-document-icon"><FileText size={18} /></span>
+                                <div className="kb-document-main"><h3 title={document.name}>{document.name}</h3><div className="kb-document-meta"><span>{document.uploader?.name || 'Workspace member'}</span><i /> <span>{formatDate(document.createdAt)}</span>{document._count?.chunks > 0 && <><i /><span>{document._count.chunks} indexed {document._count.chunks === 1 ? 'passage' : 'passages'}</span></>}</div></div>
+                                <StatusBadge status={document.status} />
+                                {!readOnlyGuest && <button className="kb-delete-button" type="button" onClick={() => setPendingDelete(document)} aria-label={`Remove ${document.name}`} title="Remove document"><Trash2 size={16} /></button>}
+                            </article>
+                        })}
+                    </div>
                 )}
-            </div>
+                {!loading && documents.length > 0 && <p className="kb-library-footer">Showing {visibleDocuments.length} of {documents.length} {documents.length === 1 ? 'document' : 'documents'}</p>}
+            </section>
 
-            {/* Error */}
-            {error && (
-                <div style={{
-                    padding: '12px 16px', borderRadius: 12, marginBottom: 20,
-                    background: 'var(--accent-red-light)', color: 'var(--accent-red)',
-                    fontSize: 13, border: '1px solid #fca5a5',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                    <AlertCircle size={15} />
-                    {error}
-                </div>
-            )}
-
-            {/* Document list */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Documents ({documents.length})
-                </h2>
-                <button onClick={fetchDocuments} style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'none', border: '1px solid var(--border)',
-                    borderRadius: 8, padding: '6px 12px',
-                    fontSize: 13, color: 'var(--text-secondary)',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                    <RefreshCw size={13} />
-                    Refresh
-                </button>
-            </div>
-
-            {loading ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 64 }}>
-                    <Loader2 size={24} color="var(--text-muted)" />
-                </div>
-            ) : documents.length === 0 ? (
-                <div style={{
-                    textAlign: 'center', padding: '64px 24px',
-                    background: '#fff', borderRadius: 16, border: '1px solid var(--border)',
-                }}>
-                    <FileText size={36} color="var(--text-muted)" style={{ marginBottom: 14 }} />
-                    <p style={{ margin: 0, fontSize: 15, color: 'var(--text-secondary)' }}>
-                        No documents yet. Upload your first PDF to get started.
-                    </p>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {documents.map((doc) => (
-                        <div key={doc.id} style={{
-                            background: '#fff', borderRadius: 14,
-                            border: '1px solid var(--border)',
-                            padding: '18px 22px',
-                            display: 'flex', alignItems: 'center', gap: 16,
-                            boxShadow: 'var(--shadow-sm)',
-                            transition: 'box-shadow 0.15s ease',
-                        }}
-                            onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
-                            onMouseLeave={e => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
-                        >
-                            {/* Icon */}
-                            <div style={{
-                                width: 42, height: 42, borderRadius: 10,
-                                background: 'var(--bg-primary)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0,
-                            }}>
-                                <FileText size={18} color="var(--text-secondary)" />
-                            </div>
-
-                            {/* Info */}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {doc.name}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                                    <StatusBadge status={doc.status} />
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)' }}>
-                                        <User size={11} />
-                                        {doc.uploader?.name || 'Unknown'}
-                                    </span>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)' }}>
-                                        <Calendar size={11} />
-                                        {new Date(doc.createdAt).toLocaleDateString()}
-                                    </span>
-                                    {doc._count?.chunks > 0 && (
-                                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                                            {doc._count.chunks} chunks
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Delete */}
-                            <button
-                                onClick={() => handleDelete(doc.id)}
-                                title="Delete document"
-                                style={{
-                                    background: 'none', border: 'none', cursor: 'pointer',
-                                    color: 'var(--text-muted)', padding: 8, borderRadius: 8,
-                                    display: 'flex', alignItems: 'center',
-                                    transition: 'all 0.15s ease', flexShrink: 0,
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-red)'; e.currentTarget.style.background = 'var(--accent-red-light)' }}
-                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none' }}
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            <DeleteDialog document={pendingDelete} onCancel={cancelDelete} onConfirm={() => void confirmDelete()} deleting={deleting} />
         </div>
     )
 }

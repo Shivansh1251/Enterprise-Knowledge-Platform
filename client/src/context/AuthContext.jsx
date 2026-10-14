@@ -1,7 +1,6 @@
-import { createContext, useContext, useState } from 'react'
+import { useState } from 'react'
 import api from '../lib/api'
-
-const AuthContext = createContext(null)
+import AuthContext from './AuthContextValue'
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(() => {
@@ -10,14 +9,17 @@ export function AuthProvider({ children }) {
     const [org, setOrg] = useState(() => {
         try { return JSON.parse(localStorage.getItem('ekp_org')) } catch { return null }
     })
+    const [demoRole, setDemoRole] = useState(() => localStorage.getItem('ekp_demo_role') || '')
 
     const login = async (email, password) => {
         const { data } = await api.post('/auth/login', { email, password })
         localStorage.setItem('ekp_token', data.token)
         localStorage.setItem('ekp_user', JSON.stringify(data.user))
         localStorage.setItem('ekp_org', JSON.stringify(data.organization))
+        localStorage.removeItem('ekp_demo_role')
         setUser(data.user)
         setOrg(data.organization)
+        setDemoRole('')
         return data
     }
 
@@ -26,8 +28,22 @@ export function AuthProvider({ children }) {
         localStorage.setItem('ekp_token', data.token)
         localStorage.setItem('ekp_user', JSON.stringify(data.user))
         localStorage.setItem('ekp_org', JSON.stringify(data.organization))
+        localStorage.removeItem('ekp_demo_role')
         setUser(data.user)
         setOrg(data.organization)
+        setDemoRole('')
+        return data
+    }
+
+    const demoLogin = async (role) => {
+        const { data } = await api.post('/auth/demo', { role })
+        localStorage.setItem('ekp_token', data.token)
+        localStorage.setItem('ekp_user', JSON.stringify(data.user))
+        localStorage.setItem('ekp_org', JSON.stringify(data.organization))
+        localStorage.setItem('ekp_demo_role', role)
+        setUser(data.user)
+        setOrg(data.organization)
+        setDemoRole(role)
         return data
     }
 
@@ -35,15 +51,15 @@ export function AuthProvider({ children }) {
         localStorage.removeItem('ekp_token')
         localStorage.removeItem('ekp_user')
         localStorage.removeItem('ekp_org')
+        localStorage.removeItem('ekp_demo_role')
         setUser(null)
         setOrg(null)
+        setDemoRole('')
     }
 
     return (
-        <AuthContext.Provider value={{ user, org, login, register, logout, isAuth: !!user }}>
+        <AuthContext.Provider value={{ user, org, demoRole, login, register, demoLogin, logout, isAuth: Boolean(user && localStorage.getItem('ekp_token')) }}>
             {children}
         </AuthContext.Provider>
     )
 }
-
-export const useAuth = () => useContext(AuthContext)

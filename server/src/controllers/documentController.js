@@ -170,7 +170,12 @@ const list = async (req, res, next) => {
         const documents = await prisma.document.findMany({
             where: { organizationId: req.organizationId },
             orderBy: { createdAt: 'desc' },
-            include: {
+            select: {
+                id: true,
+                name: true,
+                mimeType: true,
+                status: true,
+                createdAt: true,
                 uploader: { select: { name: true, email: true } },
                 _count: { select: { chunks: true } },
             },
@@ -185,7 +190,12 @@ const getOne = async (req, res, next) => {
     try {
         const document = await prisma.document.findFirst({
             where: { id: req.params.id, organizationId: req.organizationId },
-            include: {
+            select: {
+                id: true,
+                name: true,
+                mimeType: true,
+                status: true,
+                createdAt: true,
                 uploader: { select: { name: true, email: true } },
                 _count: { select: { chunks: true } },
             },
@@ -221,9 +231,11 @@ const remove = async (req, res, next) => {
             await tx.document.delete({ where: { id: document.id } });
         });
 
-        await fs.promises.unlink(document.storagePath).catch((err) => {
-            if (err.code !== 'ENOENT') console.error('Could not remove uploaded file:', err);
-        });
+        if (document.storagePath) {
+            await fs.promises.unlink(document.storagePath).catch((err) => {
+                if (err.code !== 'ENOENT') console.error('Could not remove uploaded file:', err);
+            });
+        }
         return res.json({ message: 'Document deleted' });
     } catch (err) {
         return next(err);

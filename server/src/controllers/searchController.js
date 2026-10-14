@@ -10,6 +10,11 @@ const {
 const RESULT_LIMIT = 10;
 const CANDIDATE_LIMIT = 40;
 const VALID_MODES = new Set(['hybrid', 'semantic', 'keyword']);
+const SEARCH_STOP_WORDS = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'can', 'do', 'does', 'for', 'how',
+    'i', 'in', 'is', 'it', 'of', 'on', 'our', 'the', 'to', 'we', 'what',
+    'when', 'where', 'which', 'who', 'why', 'with', 'you', 'your',
+]);
 
 function withCitation(result) {
     return {
@@ -37,10 +42,12 @@ function countOccurrences(content, term) {
 }
 
 async function searchKeywords(query, organizationId) {
-    const terms = [...new Set(query.split(/\s+/).map((term) => term.trim()).filter(Boolean))];
+    const allTerms = [...new Set((query.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) || []))];
+    const usefulTerms = allTerms.filter((term) => !SEARCH_STOP_WORDS.has(term));
+    const terms = (usefulTerms.length ? usefulTerms : allTerms).slice(0, 20);
     const chunks = await prisma.documentChunk.findMany({
         where: {
-            AND: terms.map((term) => ({ content: { contains: term, mode: 'insensitive' } })),
+            OR: terms.map((term) => ({ content: { contains: term, mode: 'insensitive' } })),
             document: { organizationId, status: 'READY' },
         },
         select: {
@@ -62,7 +69,10 @@ async function searchKeywords(query, organizationId) {
         content: chunk.content,
         pageNumber: chunk.pageNumber,
         chunkIndex: chunk.chunkIndex,
-        lexicalScore: terms.reduce((score, term) => score + countOccurrences(chunk.content, term), 0),
+        lexicalScore: terms.reduce((score, term) => {
+            const occurrences = countOccurrences(chunk.content, term);
+            return score + (occurrences ? 3 + Math.min(occurrences, 4) : 0);
+        }, 0),
     })).sort((left, right) => right.lexicalScore - left.lexicalScore || left.chunkIndex - right.chunkIndex);
 }
 

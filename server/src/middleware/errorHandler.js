@@ -33,6 +33,11 @@ const errorHandler = (err, req, res, next) => {
         return sendError(res, 'CONFLICT', 'A record with this value already exists', 409);
     }
 
+    const databaseUnavailable = new Set(['P1000', 'P1001', 'P1002', 'P1003', 'P1008', 'P1017', 'ECONNREFUSED', 'EACCES']);
+    if (databaseUnavailable.has(err.code)) {
+        return sendError(res, 'DATABASE_UNAVAILABLE', 'The database is unavailable. Start PostgreSQL, then try again.', 503);
+    }
+
     return sendError(res, 'INTERNAL_ERROR', 'An unexpected error occurred', 500);
 };
 

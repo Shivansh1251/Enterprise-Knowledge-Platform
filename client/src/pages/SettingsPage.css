@@ -1,14 +1,33 @@
-.settings-page { max-width: 850px; margin: 0 auto; }
-.settings-intro { margin: 3px 0 20px; }
-.settings-intro p { margin: 4px 0 0; color: #87918a; font-size: 11px; }
-.settings-card { margin-bottom: 12px; padding: 18px 20px; border: 1px solid #e9ecea; border-radius: 12px; background: #fff; }
+.settings-page { width: min(100%, 920px); margin: 0 auto; }
+.settings-back-link { display: inline-flex; align-items: center; gap: 6px; color: #65806b; text-decoration: none; font-size: 10px; font-weight: 600; }
+.settings-back-link:hover { color: #1e7140; }
+.settings-page-heading { margin: 17px 0 21px; }
+.settings-page-heading > span { color: #58815d; font-size: 9px; font-weight: 750; letter-spacing: .13em; }
+.settings-page-heading h1 { margin: 4px 0 5px; color: #202b23; font-size: clamp(26px, 3.4vw, 34px); font-weight: 680; letter-spacing: -.05em; }
+.settings-page-heading p { margin: 0; color: #81867b; font-size: 11px; }
+.settings-demo-notice { display: flex; align-items: center; gap: 8px; margin-bottom: 15px; padding: 11px 13px; border: 1px solid rgba(76, 124, 83, .17); border-radius: 9px; color: #58725a; background: rgba(237, 244, 229, .7); font-size: 10px; }
+.settings-demo-notice svg { flex: 0 0 auto; }
+.settings-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.settings-card { min-width: 0; padding: 18px 20px 12px; border: 1px solid rgba(110, 105, 82, .18); border-radius: 13px; background: rgba(255, 251, 241, .69); }
 .settings-card-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
-.settings-card-heading > span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; color: #398763; background: #eef7f2; }
-.settings-card-heading div { display: flex; flex-direction: column; gap: 2px; }
-.settings-card-heading strong { color: #3b4840; font-size: 11px; font-weight: 650; }
-.settings-card-heading small { color: #9aa29d; font-size: 9px; }
-.settings-row { display: flex; justify-content: space-between; gap: 15px; padding: 11px 0; border-top: 1px solid #f0f2f1; font-size: 10px; }
-.settings-row span { color: #89938d; }
-.settings-row strong { overflow-wrap: anywhere; color: #536159; font-weight: 550; text-align: right; }
-.settings-info-card p { display: flex; align-items: flex-start; gap: 8px; margin: 7px 0 0; color: #7b8780; font-size: 10px; line-height: 1.6; }
-.settings-info-card p svg { flex: 0 0 auto; margin-top: 1px; color: #4b9270; }
+.settings-card-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 10px; }
+.settings-card-icon.profile { color: #4c7953; background: #e9edde; }
+.settings-card-icon.workspace { color: #33754b; background: #e5efdf; }
+.settings-card-icon.security { color: #81754d; background: #f1eddb; }
+.settings-card-heading > span:last-child { display: flex; min-width: 0; flex-direction: column; }
+.settings-card-heading strong { color: #415044; font-size: 11px; font-weight: 670; }
+.settings-card-heading small { margin-top: 3px; color: #93968b; font-size: 9px; }
+.settings-detail-row { display: flex; min-height: 38px; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid rgba(110, 105, 82, .11); font-size: 10px; }
+.settings-detail-label { display: inline-flex; align-items: center; gap: 6px; color: #858b80; }
+.settings-detail-label svg { color: #8f9689; }
+.settings-detail-row strong { overflow: hidden; color: #4e594f; font-size: 10px; font-weight: 600; text-align: right; text-overflow: ellipsis; }
+.settings-security-card { grid-column: 1 / -1; }
+.settings-privacy-item { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.settings-privacy-item > span { display: grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; border-radius: 50%; color: #34764b; background: #e6efdd; }
+.settings-privacy-item p { margin: 1px 0 0; color: #657064; font-size: 10px; line-height: 1.5; }
+.settings-privacy-note { margin: 13px 0 0; padding-top: 11px; border-top: 1px solid rgba(110, 105, 82, .11); color: #92958a; font-size: 9px; line-height: 1.6; }
+@media (max-width: 620px) {
+    .settings-card-grid { grid-template-columns: 1fr; }
+    .settings-security-card { grid-column: auto; }
+    .settings-card { padding: 16px 15px 10px; }
+}

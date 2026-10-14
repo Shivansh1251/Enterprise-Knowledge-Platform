@@ -43,6 +43,7 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     req.organizationId = payload.organizationId;
     req.membership = membership;
+    req.demoRole = payload.demoRole || null;
     next();
 };
 

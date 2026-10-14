@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
     ArrowUpRight, BookOpen, CheckCircle2, Clock3, FileText, Search, Sparkles,
 } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import api from '../lib/api'
 import './DashboardPage.css'
 
@@ -26,6 +26,7 @@ function DocumentStatus({ status }) {
 
 export default function DashboardPage() {
     const { user, org } = useAuth()
+    const [renderedAt] = useState(() => Date.now())
     const [documents, setDocuments] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -118,7 +119,7 @@ export default function DashboardPage() {
                                     <span className="dashboard-file-icon"><FileText size={16} /></span>
                                     <span className="dashboard-document-info">
                                         <strong>{document.name}</strong>
-                                        <small>{document._count?.chunks || 0} chunks · {new Date(document.createdAt || Date.now()).toLocaleDateString()}</small>
+                                        <small>{document._count?.chunks || 0} chunks · {new Date(document.createdAt || renderedAt).toLocaleDateString()}</small>
                                     </span>
                                     <DocumentStatus status={document.status} />
                                 </Link>

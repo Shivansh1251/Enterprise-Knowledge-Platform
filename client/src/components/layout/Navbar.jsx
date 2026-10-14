@@ -1,68 +1,67 @@
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import {
-    BookOpen, LayoutDashboard, Search, Files, Settings, LogOut, Building2,
-} from 'lucide-react'
-
-const NAV_ITEMS = [
-    { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-    { to: '/search', label: 'Search', icon: Search },
-    { to: '/knowledge-base', label: 'Documents', icon: Files },
-    { to: '/settings', label: 'Settings', icon: Settings },
-]
+import { BookOpen, ChevronDown, LogOut, Settings } from 'lucide-react'
+import { useAuth } from '../../context/useAuth'
+import HankMark from './HankMark'
 
 export default function Navbar() {
-    const { user, org, logout } = useAuth()
+    const { user, org, demoRole, logout } = useAuth()
     const navigate = useNavigate()
+    const [menuOpen, setMenuOpen] = useState(false)
+    const menuRef = useRef(null)
+
+    useEffect(() => {
+        if (!menuOpen) return undefined
+        const handleOutsideClick = (event) => {
+            if (!menuRef.current?.contains(event.target)) setMenuOpen(false)
+        }
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') setMenuOpen(false)
+        }
+        document.addEventListener('mousedown', handleOutsideClick)
+        document.addEventListener('keydown', handleEscape)
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick)
+            document.removeEventListener('keydown', handleEscape)
+        }
+    }, [menuOpen])
 
     const handleLogout = () => {
         logout()
         navigate('/login')
     }
+    const initials = (user?.name || 'U').split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
 
     return (
-        <aside className="ek-sidebar">
-            <NavLink to="/" className="ek-brand" aria-label="Enterprise Knowledge home">
-                <span className="ek-brand-icon"><BookOpen size={19} strokeWidth={2.2} /></span>
-                <span className="ek-brand-name">Enterprise <strong>Knowledge</strong></span>
+        <header className="hank-topbar">
+            <NavLink to="/" className="hank-brand" aria-label="Hank home">
+                <HankMark size={34} />
+                <span><strong>Hank</strong><small>KNOWLEDGE ASSISTANT</small></span>
             </NavLink>
-
-            <div className="ek-sidebar-label">WORKSPACE</div>
-            <nav className="ek-nav" aria-label="Main navigation">
-                {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-                    <NavLink
-                        key={to}
-                        to={to}
-                        end={end}
-                        title={label}
-                        className={({ isActive }) => `ek-nav-link${isActive ? ' is-active' : ''}`}
-                    >
-                        <Icon size={17} strokeWidth={1.9} />
-                        <span>{label}</span>
+            <div className="hank-topbar-right">
+                {org?.name && <span className="hank-org-name" title={org.name}>{org.name}</span>}
+                <nav className="hank-primary-nav" aria-label="Main navigation">
+                    <NavLink to="/" end className={({ isActive }) => `hank-nav-link${isActive ? ' active' : ''}`}>
+                        <span>Ask Hank</span>
                     </NavLink>
-                ))}
-            </nav>
-
-            <div className="ek-sidebar-spacer" />
-
-            <div className="ek-org-card">
-                <span className="ek-org-icon"><Building2 size={15} /></span>
-                <div className="ek-org-copy">
-                    <span>ORGANIZATION</span>
-                    <strong title={org?.name}>{org?.name || 'Your workspace'}</strong>
+                    <NavLink to="/knowledge-base" className={({ isActive }) => `hank-nav-link${isActive ? ' active' : ''}`}>
+                        <BookOpen size={15} /> <span>Knowledge base</span>
+                    </NavLink>
+                </nav>
+                <div className="hank-account-menu" ref={menuRef}>
+                    <button className="hank-account-trigger" type="button" aria-expanded={menuOpen} aria-controls="hank-account-popover" onClick={() => setMenuOpen((open) => !open)}>
+                        <span className="hank-avatar">{initials}</span>
+                        <span className="hank-account-trigger-copy"><strong>{user?.name || 'Account'}</strong><small>{demoRole ? `${demoRole} demo` : org?.name || user?.email || 'Workspace member'}</small></span>
+                        <ChevronDown size={14} />
+                    </button>
+                    {menuOpen && <div className="hank-account-popover" id="hank-account-popover" role="group" aria-label="Account actions">
+                        <div className="hank-account-popover-head"><span className="hank-avatar large">{initials}</span><span><strong>{user?.name || 'Account'}</strong><small>{user?.email || ''}</small></span></div>
+                        {demoRole && <div className="hank-demo-access-note">{demoRole === 'guest' ? 'Guest preview · read only' : 'Admin demo workspace'}</div>}
+                        <NavLink to="/settings" onClick={() => setMenuOpen(false)}><Settings size={15} /> Account & workspace</NavLink>
+                        <button type="button" onClick={handleLogout}><LogOut size={15} /> Sign out</button>
+                    </div>}
                 </div>
             </div>
-
-            <div className="ek-profile">
-                <div className="ek-avatar">{user?.name?.charAt(0).toUpperCase() || 'U'}</div>
-                <div className="ek-profile-copy">
-                    <strong>{user?.name || 'User'}</strong>
-                    <span>{user?.email || 'Workspace member'}</span>
-                </div>
-                <button className="ek-logout" onClick={handleLogout} title="Sign out" aria-label="Sign out">
-                    <LogOut size={16} />
-                </button>
-            </div>
-        </aside>
+        </header>
     )
 }

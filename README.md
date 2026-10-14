@@ -27,6 +27,14 @@ Install:
 
 ## Quick start
 
+### 0. Configure the server
+
+From the repository root, copy `.env.example` to `server/.env` if you have not configured it already. The server and Prisma load environment settings from that file. Keep the example values for a local Docker setup, and use a private `JWT_SECRET` with at least 32 characters for a deployed environment.
+
+```powershell
+if (-not (Test-Path server/.env)) { Copy-Item .env.example server/.env }
+```
+
 ### 1. Start the database
 
 ```powershell
@@ -56,6 +64,14 @@ npm run dev
 
 Then open http://localhost:5173
 
+### Demo access and sample documents
+
+In local development, the sign-in page offers **Continue as guest** and **Admin demo**. The first demo sign-in creates a separate `Hank Sample Workspace` and adds four sample text documents covering leave, onboarding, expenses, and security incidents. Guest access can search and view sources; admin demo can manage the sample workspace. Demo access is disabled in production unless `ENABLE_DEMO_ACCESS=true` is set explicitly; set `ENABLE_DEMO_ACCESS=false` to disable it in other environments.
+
+### Production deployment
+
+Build the client with `cd client && npm ci && npm run build`, then run the server with `NODE_ENV=production npm start`. The server serves the built client and API from one origin when `client/dist` exists. Configure a private `JWT_SECRET` of at least 32 characters, `DATABASE_URL`, and `CLIENT_ORIGINS` for your deployed origin, then apply migrations with `cd server && npx prisma migrate deploy`. Use PostgreSQL with pgvector for semantic retrieval; keyword retrieval remains available without the vector extension or embedding key.
+
 ## Project structure
 
 ```
@@ -81,9 +97,12 @@ enterprise-knowledge-platform/
 
 ## API
 
-- `GET /health` — health check
+- `GET /health` — process liveness check
+- `GET /ready` — database readiness check (returns 503 when the database is unreachable)
 - `POST /api/auth/register` — register + creates organization
 - `POST /api/auth/login` — returns JWT
+- `GET /api/auth/demo-status` — reports whether demo access is enabled
+- `POST /api/auth/demo` — provisions sample data and returns guest or admin demo access
 - `GET /api/auth/me` — current user (protected)
 - `POST /api/documents` — upload PDF/TXT (multipart/form-data)
 - `GET /api/documents` — list org documents
