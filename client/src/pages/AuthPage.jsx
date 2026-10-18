@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/useAuth'
 import api from '../lib/api'
 import HankMark from '../components/layout/HankMark'
+import ThemeToggle from '../components/ThemeToggle'
 import './AuthPage.css'
 
 function Field({ id, label, icon: Icon, children }) {
@@ -84,7 +85,10 @@ export default function AuthPage() {
                     <HankMark size={38} />
                     <span><strong>Hank</strong><small>KNOWLEDGE ASSISTANT</small></span>
                 </a>
-                <span className="auth-brandbar-note"><ShieldCheck size={14} /> Your workspace stays yours</span>
+                <div className="auth-brandbar-actions">
+                    <ThemeToggle className="auth-theme-toggle" />
+                    <span className="auth-brandbar-note"><ShieldCheck size={14} /> Your workspace stays yours</span>
+                </div>
             </header>
 
             <main className="auth-layout">

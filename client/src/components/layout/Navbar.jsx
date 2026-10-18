@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { BookOpen, ChevronDown, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '../../context/useAuth'
 import HankMark from './HankMark'
+import ThemeToggle from '../ThemeToggle'
 
 export default function Navbar() {
     const { user, org, demoRole, logout } = useAuth()
@@ -48,6 +49,7 @@ export default function Navbar() {
                         <BookOpen size={15} /> <span>Knowledge base</span>
                     </NavLink>
                 </nav>
+                <ThemeToggle className="hank-theme-toggle" />
                 <div className="hank-account-menu" ref={menuRef}>
                     <button className="hank-account-trigger" type="button" aria-expanded={menuOpen} aria-controls="hank-account-popover" onClick={() => setMenuOpen((open) => !open)}>
                         <span className="hank-avatar">{initials}</span>

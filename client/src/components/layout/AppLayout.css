@@ -48,6 +48,26 @@
 .hank-account-popover > button:hover { color: #a0443d; background: #fff0e9; }
 .hank-main { width: 100%; min-height: calc(100vh - 68px); margin: 0 auto; padding: 32px clamp(16px, 4vw, 54px) 56px; }
 
+.hank-ask-fab-wrap { position: fixed; right: clamp(18px, 3vw, 38px); bottom: clamp(18px, 3vw, 34px); z-index: 20; }
+.hank-ask-fab { display: inline-flex; min-height: 54px; align-items: center; justify-content: center; gap: 10px; padding: 0 19px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; color: #fff; background: linear-gradient(135deg, #0d8247, #075f36); box-shadow: 0 12px 32px rgba(14, 100, 55, .3), 0 2px 6px rgba(16, 42, 27, .15); font-size: 13px; font-weight: 650; letter-spacing: -.01em; text-decoration: none; transition: transform .2s, box-shadow .2s, filter .2s; }
+.hank-ask-fab:hover { transform: translateY(-3px); filter: brightness(1.06); box-shadow: 0 16px 38px rgba(14, 100, 55, .36), 0 3px 8px rgba(16, 42, 27, .18); }
+.hank-ask-fab:active { transform: translateY(-1px) scale(.98); }
+.hank-ask-fab:focus-visible { outline: 3px solid rgba(35, 132, 77, .28); outline-offset: 4px; }
+.hank-ask-fab svg { transition: transform .2s; }
+.hank-ask-fab:hover svg { transform: rotate(-10deg) scale(1.08); }
+
+.hank-toast-stack { position: fixed; right: clamp(18px, 3vw, 38px); bottom: clamp(84px, 8vw, 102px); z-index: 30; width: min(390px, calc(100vw - 32px)); pointer-events: none; }
+.hank-toast-list { display: flex; flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+.hank-toast { display: flex; min-height: 68px; align-items: flex-start; gap: 11px; padding: 14px 13px; border: 1px solid rgba(91, 105, 85, .16); border-radius: 15px; color: #29352c; background: rgba(255, 253, 246, .96); box-shadow: 0 14px 40px rgba(35, 44, 36, .17); backdrop-filter: blur(16px); pointer-events: auto; }
+.hank-toast-icon { display: grid; width: 29px; height: 29px; flex: 0 0 29px; place-items: center; border-radius: 50%; color: #17683d; background: #e8f3e7; }
+.hank-toast-error .hank-toast-icon { color: #a34237; background: #fff0ea; }
+.hank-toast-info .hank-toast-icon { color: #35648c; background: #eaf2f9; }
+.hank-toast-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; padding-top: 1px; }
+.hank-toast-copy strong { color: #27352b; font-size: 12px; font-weight: 700; line-height: 1.4; }
+.hank-toast-copy > span { color: #727a70; font-size: 11px; line-height: 1.45; }
+.hank-toast-close { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; margin: -4px -4px 0 0; border: 0; border-radius: 8px; color: #858c82; background: transparent; cursor: pointer; }
+.hank-toast-close:hover { color: #313b32; background: rgba(92, 106, 87, .09); }
+
 @media (max-width: 680px) {
     .hank-topbar { min-height: 60px; padding: 0 14px; }
     .hank-topbar-right { gap: 8px; }
@@ -56,6 +76,10 @@
     .hank-account-trigger { padding: 3px; }
     .hank-nav-link { gap: 5px; padding: 0 7px; font-size: 10px; }
     .hank-main { min-height: calc(100vh - 60px); padding: 25px 14px 42px; }
+    .hank-ask-fab-wrap { right: 16px; bottom: 16px; }
+    .hank-ask-fab { min-height: 48px; gap: 8px; padding: 0 15px; font-size: 12px; }
+    .hank-toast-stack { right: 12px; bottom: 76px; width: calc(100vw - 24px); }
+    .hank-toast { min-height: 62px; border-radius: 13px; padding: 12px; }
 }
 
 @media (max-width: 390px) {

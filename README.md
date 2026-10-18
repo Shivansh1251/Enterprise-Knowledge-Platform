@@ -41,10 +41,11 @@ if (-not (Test-Path server/.env)) { Copy-Item .env.example server/.env }
 docker compose up -d
 ```
 
-### 2. Run database migration
+### 2. Generate the Prisma client and run the database migration
 
 ```powershell
 cd server
+npm run db:generate
 npx prisma migrate dev --name init
 ```
 

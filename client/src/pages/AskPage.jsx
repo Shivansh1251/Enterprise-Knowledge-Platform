@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
+import { useToast } from '../context/useToast'
 import {
     AlertCircle, ArrowLeft, BookOpen, Check, ChevronRight, CircleHelp,
-    FileText, Layers3, LoaderCircle, Search, X,
+    FileText, Layers3, LoaderCircle, Mic, MicOff, Paperclip, Search, X,
 } from 'lucide-react'
 import api from '../lib/api'
 import HankMark from '../components/layout/HankMark'
+import RollingAskButton from '../components/RollingAskButton'
 import './AskPage.css'
 
 const SUGGESTIONS = [
@@ -101,6 +103,9 @@ function DetailDialog({ result, query, mode, onClose }) {
 
 export default function AskPage() {
     const { demoRole } = useAuth()
+    const { toast } = useToast()
+    const location = useLocation()
+    const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const [query, setQuery] = useState(() => searchParams.get('q') || '')
     const [searchMode, setSearchMode] = useState('hybrid')
@@ -112,7 +117,39 @@ export default function AskPage() {
     const [submitted, setSubmitted] = useState('')
     const [filter, setFilter] = useState('All')
     const [selectedResult, setSelectedResult] = useState(null)
+    const [listening, setListening] = useState(false)
+    const [voiceNotice, setVoiceNotice] = useState('')
+    const questionRef = useRef(null)
+    const recognitionRef = useRef(null)
+    const voiceBaseRef = useRef('')
+    const finalTranscriptRef = useRef('')
     const closeResult = useCallback(() => setSelectedResult(null), [])
+
+    useEffect(() => {
+        const textarea = questionRef.current
+        if (!textarea) return
+        textarea.style.height = 'auto'
+        const nextHeight = Math.min(textarea.scrollHeight, 220)
+        textarea.style.height = `${nextHeight}px`
+        textarea.style.overflowY = textarea.scrollHeight > 220 ? 'auto' : 'hidden'
+    }, [query])
+
+    useEffect(() => {
+        if (!location.state?.focusComposer) return
+        questionRef.current?.focus()
+        navigate(location.pathname, { replace: true, state: null })
+    }, [location.pathname, location.state, navigate])
+
+    useEffect(() => () => {
+        const recognition = recognitionRef.current
+        if (recognition) {
+            recognition.onstart = null
+            recognition.onresult = null
+            recognition.onerror = null
+            recognition.onend = null
+            recognition.abort()
+        }
+    }, [])
 
     const runSearch = useCallback(async (searchQuery, mode) => {
         const cleanQuery = searchQuery.trim()
@@ -133,16 +170,24 @@ export default function AskPage() {
                 minAnimation,
             ])
             setResults(Array.isArray(data.results) ? data.results : [])
+            const resultCount = Array.isArray(data.results) ? data.results.length : 0
+            toast({
+                title: resultCount ? `Found ${resultCount} ${resultCount === 1 ? 'source' : 'sources'}` : 'No matching sources found',
+                description: resultCount ? 'Hank found passages in your knowledge base.' : 'Try another question or add more documents.',
+                variant: resultCount ? 'success' : 'info',
+            })
             setSearchInfo({ mode: data.retrievalMode || mode, degraded: Boolean(data.degraded), message: data.message || '' })
             setFilter('All')
             setView('results')
         } catch (err) {
-            setError(err.response?.data?.error?.message || 'Hank could not search the knowledge base. Please try again.')
+            const message = err.response?.data?.error?.message || 'Hank could not search the knowledge base. Please try again.'
+            setError(message)
+            toast({ title: 'Search could not complete', description: message, variant: 'error' })
             setView('landing')
         } finally {
             clearInterval(stepTimer)
         }
-    }, [])
+    }, [toast])
 
     const linkedQuery = searchParams.get('q')
     useEffect(() => {
@@ -155,6 +200,60 @@ export default function AskPage() {
     const handleSubmit = (event) => {
         event.preventDefault()
         void runSearch(query, searchMode)
+    }
+
+    const toggleVoiceInput = () => {
+        if (listening) {
+            recognitionRef.current?.stop()
+            return
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        if (!SpeechRecognition) {
+            setVoiceNotice('Voice input is not supported in this browser. You can type your question instead.')
+            return
+        }
+
+        setVoiceNotice('')
+        voiceBaseRef.current = query.trim()
+        finalTranscriptRef.current = ''
+        const recognition = new SpeechRecognition()
+        recognition.lang = navigator.language || 'en-US'
+        recognition.continuous = true
+        recognition.interimResults = true
+        recognition.onstart = () => setListening(true)
+        recognition.onresult = (event) => {
+            let interimTranscript = ''
+            for (let index = event.resultIndex; index < event.results.length; index += 1) {
+                const transcript = event.results[index][0].transcript.trim()
+                if (event.results[index].isFinal) {
+                    finalTranscriptRef.current = `${finalTranscriptRef.current} ${transcript}`.trim()
+                } else {
+                    interimTranscript = `${interimTranscript} ${transcript}`.trim()
+                }
+            }
+            const transcript = `${finalTranscriptRef.current} ${interimTranscript}`.trim()
+            setQuery([voiceBaseRef.current, transcript].filter(Boolean).join(voiceBaseRef.current ? '\n' : '').slice(0, 200))
+        }
+        recognition.onerror = (event) => {
+            setListening(false)
+            recognitionRef.current = null
+            setVoiceNotice(event.error === 'not-allowed'
+                ? 'Microphone access was blocked. Allow access in your browser settings to dictate a question.'
+                : 'Voice input stopped. You can try again or type your question.')
+        }
+        recognition.onend = () => {
+            setListening(false)
+            recognitionRef.current = null
+        }
+        recognitionRef.current = recognition
+        try {
+            recognition.start()
+        } catch {
+            recognitionRef.current = null
+            setListening(false)
+            setVoiceNotice('Voice input could not start. You can try again or type your question.')
+        }
     }
 
     const availableFilters = ['All', ...new Set(results.map((result) => getFileType(result.documentName || result.citation?.documentName)).filter((type) => type !== 'Document'))]
@@ -215,9 +314,9 @@ export default function AskPage() {
             <div className="hank-hero-mark"><HankMark size={58} /></div>
             <h1>Ask Hank about your knowledge base</h1>
             <p className="hank-hero-subtitle">Ask a question and Hank will find the most relevant passages in your organization’s documents.</p>
-            <form className="hank-composer" onSubmit={handleSubmit}>
+            <form className={`hank-composer${listening ? ' is-listening' : ''}`} onSubmit={handleSubmit} aria-busy={listening}>
                 <label className="sr-only" htmlFor="hank-question">Ask your knowledge base</label>
-                <textarea id="hank-question" aria-describedby="hank-enter-hint" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit() } }} placeholder="Ask anything… e.g. What is our work from home policy?" maxLength={200} />
+                <textarea ref={questionRef} id="hank-question" aria-describedby="hank-enter-hint" value={query} onChange={(event) => { setQuery(event.target.value); setVoiceNotice('') }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit() } }} placeholder="Ask Hank anything…" maxLength={200} />
                 <div className="hank-composer-bottom">
                     <div className="hank-composer-options">
                         {demoRole !== 'guest' && <NavLinkUpload />}
@@ -227,17 +326,24 @@ export default function AskPage() {
                             </select>
                         </label>
                     </div>
-                    <button className="hank-ask-button" type="submit" disabled={!query.trim()}><span>Ask Hank</span><Search size={15} /></button>
+                    <div className="hank-composer-actions">
+                        <button className={`hank-mic-button${listening ? ' is-listening' : ''}`} type="button" aria-label={listening ? 'Stop voice input' : 'Start voice input'} aria-pressed={listening} title={listening ? 'Stop voice input' : 'Dictate a question'} onClick={toggleVoiceInput}>
+                            {listening ? <MicOff size={18} /> : <Mic size={18} />}
+                        </button>
+                        <RollingAskButton disabled={!query.trim()} />
+                    </div>
                 </div>
             </form>
+            {voiceNotice && <p className="hank-voice-notice" role="status">{voiceNotice}</p>}
+            {listening && <p className="hank-voice-listening" role="status"><span /> Listening… speak your question, then tap the microphone to stop.</p>}
             <p id="hank-enter-hint" className="hank-enter-hint">Press <kbd>Enter</kbd> to ask · <kbd>Shift + Enter</kbd> for a new line</p>
             {error && <div className="hank-error"><AlertCircle size={16} />{error}</div>}
-            <div className="hank-suggestions"><span>TRY ASKING</span><div>{SUGGESTIONS.map((suggestion) => <button key={suggestion} onClick={() => setQuery(suggestion)}>{suggestion}</button>)}</div></div>
+            <div className="hank-suggestions"><span>TRY ASKING</span><div>{SUGGESTIONS.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuery(suggestion)}>{suggestion}</button>)}</div></div>
             <p className="hank-landing-footnote">Hank searches your organization’s uploaded documents and shows the source for every match.</p>
         </section>
     )
 }
 
 function NavLinkUpload() {
-    return <Link className="hank-upload-link" to="/knowledge-base"><span>+</span> Add documents</Link>
+    return <Link className="hank-upload-link" to="/knowledge-base"><Paperclip size={15} /> Add documents</Link>
 }

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch src/app.js",
     "start": "node src/app.js",
+    "db:generate": "prisma generate",
     "embeddings:backfill": "node src/scripts/embed-existing-chunks.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
