@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import * as m from 'motion/react-m'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { useToast } from '../context/useToast'
@@ -9,6 +10,7 @@ import {
 import api from '../lib/api'
 import HankMark from '../components/layout/HankMark'
 import RollingAskButton from '../components/RollingAskButton'
+import StaggeredText from '../components/StaggeredText'
 import './AskPage.css'
 
 const SUGGESTIONS = [
@@ -42,7 +44,7 @@ function CitationCard({ result, index, onOpen }) {
             <p>{excerpt(result.content)}</p>
             <div className="hank-card-footer">
                 <span>{pageNumber ? `Page ${pageNumber}` : `Chunk ${(chunkIndex ?? 0) + 1}`}</span>
-                <span className="hank-card-open">Open source <ChevronRight size={14} /></span>
+                <span className="hank-card-open"><StaggeredText>Open source</StaggeredText> <ChevronRight size={14} /></span>
             </div>
         </button>
     )
@@ -289,12 +291,12 @@ export default function AskPage() {
                         <HankMark size={34} />
                         <div><h1>Hank found {results.length} {results.length === 1 ? 'source' : 'sources'}</h1><p>For “{submitted}” · {searchInfo?.mode || searchMode} search</p></div>
                     </div>
-                    <button type="button" className="hank-new-question" onClick={() => { setView('landing'); setError(''); setSelectedResult(null) }}><ArrowLeft size={15} /> Ask another question</button>
+                    <button type="button" className="hank-new-question" onClick={() => { setView('landing'); setError(''); setSelectedResult(null) }}><ArrowLeft size={15} /> <StaggeredText>Ask another question</StaggeredText></button>
                 </header>
                 {searchInfo?.message && <div className={`hank-search-notice${searchInfo.degraded ? ' degraded' : ''}`}><AlertCircle size={15} />{searchInfo.message}</div>}
                 <div className="hank-results-toolbar">
                     <div className="hank-filter-tabs" role="group" aria-label="Filter source results">
-                        {availableFilters.map((item) => <button type="button" key={item} className={filter === item ? 'selected' : ''} onClick={() => setFilter(item)} aria-pressed={filter === item}>{item}</button>)}
+                        {availableFilters.map((item) => <button type="button" key={item} className={filter === item ? 'selected' : ''} onClick={() => setFilter(item)} aria-pressed={filter === item}><StaggeredText>{item}</StaggeredText></button>)}
                     </div>
                     <span className="hank-result-count">{filteredResults.length} {filteredResults.length === 1 ? 'source' : 'sources'}</span>
                 </div>
@@ -302,7 +304,7 @@ export default function AskPage() {
                 {filteredResults.length ? (
                     <div className="hank-results-grid">{filteredResults.map((result, index) => <CitationCard key={result.chunkId || `${result.documentId}-${index}`} result={result} index={index} onOpen={setSelectedResult} />)}</div>
                 ) : (
-                    <div className="hank-empty-results"><Search size={23} /><h2>No matching passages found</h2><p>Try a different question, or add more documents to your knowledge base.</p><button type="button" onClick={() => { setView('landing'); setQuery('') }}>Ask Hank another question</button></div>
+                    <div className="hank-empty-results"><Search size={23} /><h2>No matching passages found</h2><p>Try a different question, or add more documents to your knowledge base.</p><button type="button" onClick={() => { setView('landing'); setQuery('') }}><StaggeredText>Ask Hank another question</StaggeredText></button></div>
                 )}
                 {selectedResult && <DetailDialog result={selectedResult} query={submitted} mode={searchInfo?.mode || searchMode} onClose={closeResult} />}
             </section>
@@ -320,11 +322,17 @@ export default function AskPage() {
                 <div className="hank-composer-bottom">
                     <div className="hank-composer-options">
                         {demoRole !== 'guest' && <NavLinkUpload />}
-                        <label className="hank-mode-select">Search mode
-                            <select aria-label="Search mode" value={searchMode} onChange={(event) => setSearchMode(event.target.value)}>
-                                <option value="hybrid">Hybrid</option><option value="semantic">Semantic</option><option value="keyword">Keyword</option>
-                            </select>
-                        </label>
+                        <div className="hank-mode-select" role="group" aria-label="Search mode">
+                            <span className="hank-mode-caption">Search mode</span>
+                            <div className="hank-mode-switch">
+                                {[['hybrid', 'Hybrid'], ['semantic', 'Semantic'], ['keyword', 'Keyword']].map(([value, label]) => (
+                                    <m.button key={value} type="button" className={searchMode === value ? 'selected' : ''} aria-pressed={searchMode === value} onClick={() => setSearchMode(value)} whileTap={{ scale: .96 }}>
+                                        {searchMode === value && <m.span className="hank-mode-indicator" layoutId="hank-search-mode-indicator" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+                                        <span className="hank-mode-label">{label}</span>
+                                    </m.button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                     <div className="hank-composer-actions">
                         <button className={`hank-mic-button${listening ? ' is-listening' : ''}`} type="button" aria-label={listening ? 'Stop voice input' : 'Start voice input'} aria-pressed={listening} title={listening ? 'Stop voice input' : 'Dictate a question'} onClick={toggleVoiceInput}>
@@ -338,12 +346,12 @@ export default function AskPage() {
             {listening && <p className="hank-voice-listening" role="status"><span /> Listening… speak your question, then tap the microphone to stop.</p>}
             <p id="hank-enter-hint" className="hank-enter-hint">Press <kbd>Enter</kbd> to ask · <kbd>Shift + Enter</kbd> for a new line</p>
             {error && <div className="hank-error"><AlertCircle size={16} />{error}</div>}
-            <div className="hank-suggestions"><span>TRY ASKING</span><div>{SUGGESTIONS.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuery(suggestion)}>{suggestion}</button>)}</div></div>
+            <div className="hank-suggestions"><span>TRY ASKING</span><div>{SUGGESTIONS.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuery(suggestion)}><StaggeredText>{suggestion}</StaggeredText></button>)}</div></div>
             <p className="hank-landing-footnote">Hank searches your organization’s uploaded documents and shows the source for every match.</p>
         </section>
     )
 }
 
 function NavLinkUpload() {
-    return <Link className="hank-upload-link" to="/knowledge-base"><Paperclip size={15} /> Add documents</Link>
+    return <Link className="hank-upload-link" to="/knowledge-base" aria-label="Add documents" title="Add documents"><Paperclip size={17} aria-hidden="true" /></Link>
 }

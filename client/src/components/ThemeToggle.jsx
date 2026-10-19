@@ -1,5 +1,6 @@
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
+import StaggeredText from './StaggeredText'
 
 export default function ThemeToggle({ className = '' }) {
     const { theme, toggleTheme } = useTheme()
@@ -16,7 +17,7 @@ export default function ThemeToggle({ className = '' }) {
             onClick={toggleTheme}
         >
             <Icon size={17} aria-hidden="true" />
-            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            <StaggeredText>{theme === 'dark' ? 'Light' : 'Dark'}</StaggeredText>
         </button>
     )
 }

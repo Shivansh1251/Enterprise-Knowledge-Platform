@@ -42,7 +42,18 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/ready', async (req, res) => {
     try {
         await prisma.$queryRaw`SELECT 1`;
-        return res.json({ status: 'ready', database: 'ok' });
+        const tables = await prisma.$queryRaw`
+            SELECT
+                to_regclass('public.users') IS NOT NULL AS users,
+                to_regclass('public.organizations') IS NOT NULL AS organizations,
+                to_regclass('public.organization_members') IS NOT NULL AS organization_members,
+                to_regclass('public.documents') IS NOT NULL AS documents,
+                to_regclass('public.document_chunks') IS NOT NULL AS document_chunks
+        `;
+        if (Object.values(tables[0]).some((exists) => !exists)) {
+            return res.status(503).json({ status: 'not_ready', database: 'ok', schema: 'unavailable' });
+        }
+        return res.json({ status: 'ready', database: 'ok', schema: 'ok' });
     } catch {
         return res.status(503).json({ status: 'not_ready', database: 'unavailable' });
     }
@@ -69,7 +80,8 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(clientDistPath)) {
 app.use(errorHandler);
 
 // ── Start server ──────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+const PORT = Number(process.env.PORT) || 5000;
+const HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
 });

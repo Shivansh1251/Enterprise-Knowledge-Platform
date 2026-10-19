@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': 'http://localhost:5000',
-      '/health': 'http://localhost:5000',
+      '/api': 'http://127.0.0.1:5000',
+      '/health': 'http://127.0.0.1:5000',
+      '/ready': 'http://127.0.0.1:5000',
     },
   },
 })

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
     AlertCircle, BookOpen, Check, CheckCircle2, Clock3, FileText, FileUp,
-    LoaderCircle, RefreshCw, Search, ShieldCheck, Trash2, UploadCloud, X,
+    LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, Trash2, UploadCloud, X,
 } from 'lucide-react'
 import api from '../lib/api'
+import StaggeredText from '../components/StaggeredText'
 import { useAuth } from '../context/useAuth'
 import './KnowledgeBasePage.css'
 
@@ -72,8 +73,8 @@ function DeleteDialog({ document, onCancel, onConfirm, deleting }) {
                 <h2 id="kb-delete-title">Remove this document?</h2>
                 <p id="kb-delete-copy"><strong>{document.name}</strong> and its indexed passages will be removed from this workspace.</p>
                 <div className="kb-dialog-actions">
-                    <button ref={cancelButtonRef} type="button" className="kb-button kb-button-secondary" onClick={onCancel} disabled={deleting}>Keep document</button>
-                    <button type="button" className="kb-button kb-button-danger" onClick={onConfirm} disabled={deleting}>{deleting ? <LoaderCircle size={15} className="kb-spin" /> : <Trash2 size={15} />}{deleting ? 'Removing…' : 'Remove document'}</button>
+                    <button ref={cancelButtonRef} type="button" className="kb-button kb-button-secondary" onClick={onCancel} disabled={deleting}><StaggeredText>Keep document</StaggeredText></button>
+                    <button type="button" className="kb-button kb-button-danger" onClick={onConfirm} disabled={deleting}>{deleting ? <LoaderCircle size={15} className="kb-spin" /> : <Trash2 size={15} />}<StaggeredText>{deleting ? 'Removing…' : 'Remove document'}</StaggeredText></button>
                 </div>
             </section>
         </div>
@@ -213,9 +214,9 @@ export default function KnowledgeBasePage() {
                     <p>Manage the documents Hank can search and cite in its answers.</p>
                 </div>
                 <div className="kb-heading-actions">
-                    <Link className="kb-button kb-button-secondary kb-ask-link" to="/"><BookOpen size={15} /> Ask Hank</Link>
+                    <Link className="kb-button kb-button-secondary kb-ask-link" to="/"><BookOpen size={15} /> <StaggeredText>Ask Hank</StaggeredText></Link>
                     <button className="kb-button kb-button-secondary kb-refresh" type="button" onClick={() => void refreshDocuments()} disabled={refreshing}>
-                        <RefreshCw size={15} className={refreshing ? 'kb-spin' : ''} /> <span>{refreshing ? 'Refreshing' : 'Refresh'}</span>
+                        <RefreshCw size={15} className={refreshing ? 'kb-spin' : ''} /> <StaggeredText>{refreshing ? 'Refreshing' : 'Refresh'}</StaggeredText>
                     </button>
                 </div>
             </header>
@@ -235,14 +236,14 @@ export default function KnowledgeBasePage() {
                 <input ref={fileInputRef} className="kb-file-input" id="kb-file-upload" type="file" accept=".pdf,.txt,application/pdf,text/plain" onChange={(event) => void handleUpload(event.target.files?.[0])} disabled={uploading} />
                 <span className="kb-upload-icon">{uploading ? <LoaderCircle size={23} className="kb-spin" /> : <UploadCloud size={23} />}</span>
                 <div className="kb-upload-copy">
-                    <h2>{uploading ? `Uploading${uploadProgress ? ` · ${uploadProgress}%` : '…'}` : 'Add documents to Hank'}</h2>
+                    <h2>{uploading ? `Uploading${uploadProgress ? ` · ${uploadProgress}%` : '…'}` : 'Drop files here'}</h2>
                     <p>{uploading ? 'Your file will be searchable once indexing is complete.' : 'Drop a PDF or TXT file here, or choose a file from your device.'}</p>
                     {uploading && <div className="kb-progress" role="progressbar" aria-label="File upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadProgress}><span style={{ width: `${uploadProgress}%` }} /></div>}
                     {!uploading && <span className="kb-upload-limit">PDF or TXT <i /> Up to 25 MB</span>}
                 </div>
-                <label className={`kb-button kb-button-primary${uploading ? ' is-disabled' : ''}`} htmlFor="kb-file-upload" aria-disabled={uploading}>
-                    <FileUp size={15} /> Browse files
-                </label>
+                <button className="kb-upload-action" type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Choose files to upload" title="Choose files to upload">
+                    <Plus size={20} aria-hidden="true" />
+                </button>
             </section>}
 
             {error && <div className="kb-feedback kb-feedback-error" role="alert"><AlertCircle size={16} /><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={15} /></button></div>}
@@ -255,14 +256,14 @@ export default function KnowledgeBasePage() {
                 </div>
                 <div className="kb-list-toolbar">
                     <div className="kb-filter-tabs" role="group" aria-label="Filter documents">
-                        {['All', 'Ready', 'Processing', 'Failed'].map((item) => <button key={item} type="button" aria-pressed={filter === item} className={filter === item ? 'selected' : ''} onClick={() => setFilter(item)}>{item}{item === 'All' ? ` ${counts.total}` : item === 'Ready' ? ` ${counts.ready}` : item === 'Processing' ? ` ${counts.processing}` : ''}</button>)}
+                        {['All', 'Ready', 'Processing', 'Failed'].map((item) => <button key={item} type="button" aria-pressed={filter === item} className={filter === item ? 'selected' : ''} onClick={() => setFilter(item)}><StaggeredText>{`${item}${item === 'All' ? ` ${counts.total}` : item === 'Ready' ? ` ${counts.ready}` : item === 'Processing' ? ` ${counts.processing}` : ''}`}</StaggeredText></button>)}
                     </div>
                 </div>
 
                 {loading ? <div className="kb-loading"><LoaderCircle size={23} className="kb-spin" /><span>Loading your documents…</span></div> : error && documents.length === 0 ? (
-                    <div className="kb-empty kb-empty-error"><div className="kb-empty-icon"><AlertCircle size={22} /></div><h3>Couldn’t load the library</h3><p>Check that the API is running, then try again.</p><button className="kb-button kb-button-secondary" type="button" onClick={() => void refreshDocuments()}><RefreshCw size={14} /> Try again</button></div>
+                    <div className="kb-empty kb-empty-error"><div className="kb-empty-icon"><AlertCircle size={22} /></div><h3>Couldn’t load the library</h3><p>Check that the API is running, then try again.</p><button className="kb-button kb-button-secondary" type="button" onClick={() => void refreshDocuments()}><RefreshCw size={14} /> <StaggeredText>Try again</StaggeredText></button></div>
                 ) : visibleDocuments.length === 0 ? (
-                    <div className="kb-empty"><div className="kb-empty-icon"><FileText size={22} /></div><h3>{documents.length === 0 ? 'Your library is ready for its first document' : 'No documents match this view'}</h3><p>{documents.length === 0 ? (readOnlyGuest ? 'No sample documents are available in this workspace yet.' : 'Add a PDF or text file to give Hank something useful to search.') : 'Try a different search or filter.'}</p>{documents.length === 0 && !readOnlyGuest && <button type="button" className="kb-button kb-button-primary" onClick={() => fileInputRef.current?.click()}><FileUp size={15} /> Choose a document</button>}</div>
+                    <div className="kb-empty"><div className="kb-empty-icon"><FileText size={22} /></div><h3>{documents.length === 0 ? 'Your library is ready for its first document' : 'No documents match this view'}</h3><p>{documents.length === 0 ? (readOnlyGuest ? 'No sample documents are available in this workspace yet.' : 'Add a PDF or text file to give Hank something useful to search.') : 'Try a different search or filter.'}</p>{documents.length === 0 && !readOnlyGuest && <button type="button" className="kb-button kb-button-primary" onClick={() => fileInputRef.current?.click()}><FileUp size={15} /> <StaggeredText>Choose a document</StaggeredText></button>}</div>
                 ) : (
                     <div className="kb-document-list" role="list">
                         {visibleDocuments.map((document) => {

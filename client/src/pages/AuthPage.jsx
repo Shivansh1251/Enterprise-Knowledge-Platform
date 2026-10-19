@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/useAuth'
 import api from '../lib/api'
 import HankMark from '../components/layout/HankMark'
+import StaggeredText from '../components/StaggeredText'
 import ThemeToggle from '../components/ThemeToggle'
 import './AuthPage.css'
 
@@ -17,6 +18,21 @@ function Field({ id, label, icon: Icon, children }) {
             <div className="auth-input-wrap"><Icon size={16} aria-hidden="true" />{children}</div>
         </div>
     )
+}
+
+function getAuthErrorMessage(error, action, serviceStatus) {
+    const message = error.response?.data?.error?.message
+    if (message) return message
+    if (serviceStatus === 'schema-unavailable' || error.response?.data?.error?.code === 'DATABASE_SCHEMA_UNAVAILABLE') {
+        return 'The database schema has not been initialized. Run the Prisma migrations, then try again.'
+    }
+    if (serviceStatus === 'database-unavailable' || error.response?.data?.error?.code === 'DATABASE_UNAVAILABLE') {
+        return 'PostgreSQL is unavailable. Start the database, then try again.'
+    }
+    if (serviceStatus === 'api-unavailable' || !error.response || error.response.status >= 500) {
+        return 'Hank’s API can’t be reached. Start or restart the backend on port 5000, then try again.'
+    }
+    return `${action} failed (HTTP ${error.response.status}). Check your details and try again.`
 }
 
 export default function AuthPage() {
@@ -31,9 +47,33 @@ export default function AuthPage() {
 
     useEffect(() => {
         let active = true
-        api.get('/auth/demo-status')
-            .then(({ data }) => { if (active) setDemoStatus(data.enabled ? 'enabled' : 'disabled') })
-            .catch(() => { if (active) setDemoStatus('unavailable') })
+        const checkAvailability = async () => {
+            try {
+                const apiResponse = await fetch('/health')
+                if (!apiResponse.ok) throw new Error('API unavailable')
+            } catch {
+                if (active) setDemoStatus('api-unavailable')
+                return
+            }
+
+            try {
+                const readyResponse = await fetch('/ready')
+                if (!readyResponse.ok) {
+                    const readiness = await readyResponse.json().catch(() => ({}))
+                    if (active) {
+                        setDemoStatus(readiness.schema === 'unavailable'
+                            ? 'schema-unavailable'
+                            : readyResponse.status === 503 ? 'database-unavailable' : 'api-unavailable')
+                    }
+                    return
+                }
+                const { data } = await api.get('/auth/demo-status')
+                if (active) setDemoStatus(data.enabled ? 'enabled' : 'disabled')
+            } catch {
+                if (active) setDemoStatus('api-unavailable')
+            }
+        }
+        void checkAvailability()
         return () => { active = false }
     }, [])
 
@@ -54,7 +94,7 @@ export default function AuthPage() {
             }
             navigate('/')
         } catch (err) {
-            setError(err.response?.data?.error?.message || 'Something went wrong. Please try again.')
+            setError(getAuthErrorMessage(err, mode === 'login' ? 'Sign in' : 'Account creation', demoStatus))
         } finally {
             setLoading('')
         }
@@ -67,7 +107,7 @@ export default function AuthPage() {
             await demoLogin(role)
             navigate('/')
         } catch (err) {
-            setError(err.response?.data?.error?.message || 'Demo access is not available right now.')
+            setError(getAuthErrorMessage(err, 'Demo access', demoStatus))
         } finally {
             setLoading('')
         }
@@ -114,8 +154,8 @@ export default function AuthPage() {
                     </div>
 
                     <div className="auth-mode-tabs" role="group" aria-label="Account access">
-                        <button type="button" aria-pressed={mode === 'login'} className={mode === 'login' ? 'selected' : ''} onClick={() => changeMode('login')}>Sign in</button>
-                        <button type="button" aria-pressed={mode === 'register'} className={mode === 'register' ? 'selected' : ''} onClick={() => changeMode('register')}>Sign up</button>
+                        <button type="button" aria-pressed={mode === 'login'} className={mode === 'login' ? 'selected' : ''} onClick={() => changeMode('login')}><StaggeredText>Sign in</StaggeredText></button>
+                        <button type="button" aria-pressed={mode === 'register'} className={mode === 'register' ? 'selected' : ''} onClick={() => changeMode('register')}><StaggeredText>Sign up</StaggeredText></button>
                     </div>
 
                     {error && <div className="auth-error" role="alert"><AlertCircle size={16} /><span>{error}</span></div>}
@@ -137,7 +177,7 @@ export default function AuthPage() {
                             <button className="auth-password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                         </Field>
                         <button className="auth-submit" type="submit" disabled={Boolean(loading)}>
-                            {loading === 'account' ? <LoaderCircle size={17} className="auth-spin" /> : <span>{mode === 'login' ? 'Sign in to Hank' : 'Create account'}</span>}
+                            {loading === 'account' ? <LoaderCircle size={17} className="auth-spin" /> : <StaggeredText>{mode === 'login' ? 'Sign in to Hank' : 'Create account'}</StaggeredText>}
                             {loading !== 'account' && <ArrowRight size={17} />}
                         </button>
                     </form>
@@ -147,19 +187,21 @@ export default function AuthPage() {
                         <div className="auth-demo-options">
                             <button type="button" className="auth-demo-button" onClick={() => handleDemoLogin('guest')} disabled={Boolean(loading)}>
                                 <span className="auth-demo-icon guest"><BookOpen size={17} /></span>
-                                <span className="auth-demo-copy"><strong>{loading === 'guest' ? 'Opening guest access…' : 'Continue as guest'}</strong><small>Explore Hank and sample documents</small></span>
+                                <span className="auth-demo-copy"><strong><StaggeredText>{loading === 'guest' ? 'Opening guest access…' : 'Continue as guest'}</StaggeredText></strong><small>Explore Hank and sample documents</small></span>
                                 {loading === 'guest' ? <LoaderCircle size={15} className="auth-spin" /> : <ArrowRight size={15} />}
                             </button>
                             <button type="button" className="auth-demo-button" onClick={() => handleDemoLogin('admin')} disabled={Boolean(loading)}>
                                 <span className="auth-demo-icon admin"><ShieldCheck size={17} /></span>
-                                <span className="auth-demo-copy"><strong>{loading === 'admin' ? 'Opening admin demo…' : 'Admin demo'}</strong><small>View the sample workspace as admin</small></span>
+                                <span className="auth-demo-copy"><strong><StaggeredText>{loading === 'admin' ? 'Opening admin demo…' : 'Admin demo'}</StaggeredText></strong><small>View the sample workspace as admin</small></span>
                                 {loading === 'admin' ? <LoaderCircle size={15} className="auth-spin" /> : <ArrowRight size={15} />}
                             </button>
                         </div>
                         <p className="auth-demo-note">Demo access uses a separate sample workspace with example documents.</p>
                     </>}
-                    {demoStatus !== 'enabled' && <div className="auth-card-footer">New to Hank? <button type="button" onClick={() => changeMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Create an account' : 'Sign in instead'}</button></div>}
-                    {demoStatus === 'unavailable' && <p className="auth-demo-unavailable">Sample access isn’t available right now. Check that the API and database are running.</p>}
+                    {demoStatus !== 'enabled' && <div className="auth-card-footer">New to Hank? <button type="button" onClick={() => changeMode(mode === 'login' ? 'register' : 'login')}><StaggeredText>{mode === 'login' ? 'Create an account' : 'Sign in instead'}</StaggeredText></button></div>}
+                    {demoStatus === 'api-unavailable' && <p className="auth-demo-unavailable" role="status">Hank’s API is offline. Start the backend server on port 5000 to sign in or create an account.</p>}
+                    {demoStatus === 'database-unavailable' && <p className="auth-demo-unavailable" role="status">Hank’s API is online, but PostgreSQL is unavailable. Start the database to sign in or create an account.</p>}
+                    {demoStatus === 'schema-unavailable' && <p className="auth-demo-unavailable" role="status">PostgreSQL is running, but Hank’s tables are missing. Run the Prisma migrations to enable sign-in and sign-up.</p>}
                 </section>
             </main>
             <footer className="auth-footer">Hank searches only the documents in your organization’s knowledge base.</footer>

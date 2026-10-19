@@ -4,6 +4,7 @@ import { BookOpen, ChevronDown, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '../../context/useAuth'
 import HankMark from './HankMark'
 import ThemeToggle from '../ThemeToggle'
+import StaggeredText from '../StaggeredText'
 
 export default function Navbar() {
     const { user, org, demoRole, logout } = useAuth()
@@ -53,14 +54,14 @@ export default function Navbar() {
                 <div className="hank-account-menu" ref={menuRef}>
                     <button className="hank-account-trigger" type="button" aria-expanded={menuOpen} aria-controls="hank-account-popover" onClick={() => setMenuOpen((open) => !open)}>
                         <span className="hank-avatar">{initials}</span>
-                        <span className="hank-account-trigger-copy"><strong>{user?.name || 'Account'}</strong><small>{demoRole ? `${demoRole} demo` : org?.name || user?.email || 'Workspace member'}</small></span>
+                        <span className="hank-account-trigger-copy"><strong><StaggeredText>{user?.name || 'Account'}</StaggeredText></strong><small>{demoRole ? `${demoRole} demo` : org?.name || user?.email || 'Workspace member'}</small></span>
                         <ChevronDown size={14} />
                     </button>
                     {menuOpen && <div className="hank-account-popover" id="hank-account-popover" role="group" aria-label="Account actions">
                         <div className="hank-account-popover-head"><span className="hank-avatar large">{initials}</span><span><strong>{user?.name || 'Account'}</strong><small>{user?.email || ''}</small></span></div>
                         {demoRole && <div className="hank-demo-access-note">{demoRole === 'guest' ? 'Guest preview · read only' : 'Admin demo workspace'}</div>}
                         <NavLink to="/settings" onClick={() => setMenuOpen(false)}><Settings size={15} /> Account & workspace</NavLink>
-                        <button type="button" onClick={handleLogout}><LogOut size={15} /> Sign out</button>
+                        <button type="button" onClick={handleLogout}><LogOut size={15} /> <StaggeredText>Sign out</StaggeredText></button>
                     </div>}
                 </div>
             </div>
