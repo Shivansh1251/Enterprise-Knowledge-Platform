@@ -81,6 +81,28 @@ select:focus-visible {
   }
 }
 
+/* Incognito uses a high-contrast monochrome palette across the complete UI. */
+html[data-incognito='true']:not([data-theme='dark']) #root { filter: grayscale(1) invert(1); }
+html[data-incognito='true'][data-theme='dark'] #root { filter: grayscale(1); }
+
+.incognito-mask-toggle {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid rgba(94, 108, 92, .2);
+  border-radius: 50%;
+  color: #59675d;
+  background: rgba(255, 252, 241, .66);
+  cursor: pointer;
+  transition: color .18s, background .18s, border-color .18s, transform .18s;
+}
+
+.incognito-mask-toggle:hover { transform: translateY(-1px); border-color: rgba(37, 121, 72, .35); color: #1e7444; }
+.incognito-mask-toggle.is-active { border-color: #666; color: #111; background: #e5e5e5; }
+.incognito-mask-toggle:focus-visible { outline: 3px solid rgba(24, 126, 67, .42); outline-offset: 2px; }
+
 .theme-toggle {
   display: inline-flex;
   min-height: 38px;
@@ -149,6 +171,10 @@ select:focus-visible {
   background: #29372f;
 }
 
+:root[data-theme='dark'] .incognito-mask-toggle { border-color: #3a4740; color: #c9d2ca; background: #202824; }
+:root[data-theme='dark'] .incognito-mask-toggle:hover,
+:root[data-theme='dark'] .incognito-mask-toggle.is-active { border-color: #788078; color: #fff; background: #343a35; }
+
 :root[data-theme='dark'] .hank-shell {
   color: #eaf0ea;
   background:
@@ -210,6 +236,9 @@ select:focus-visible {
 :root[data-theme='dark'] .hank-mode-switch button { color: #b5c0b6; }
 :root[data-theme='dark'] .hank-mode-switch button.selected { color: #d4f1d8; }
 :root[data-theme='dark'] .hank-mode-indicator { border-color: rgba(119, 194, 142, .12); background: #284333; box-shadow: 0 2px 6px rgba(0,0,0,.22); }
+:root[data-theme='dark'] .hank-answer-card { border-color: #3f5745; color: #e1ebe2; background: rgba(35, 47, 38, .95); }
+:root[data-theme='dark'] .hank-answer-heading { color: #c9e5cd; }
+:root[data-theme='dark'] .hank-answer-card > p { color: #d2ddd3; }
 :root[data-theme='dark'] .hank-mic-button { border-color: #3b4840; color: #c4cec5; background: #252e29; }
 :root[data-theme='dark'] .hank-mic-button:hover { border-color: #568364; color: #d5f2dc; background: #2b3a30; }
 :root[data-theme='dark'] .hank-mic-button.is-listening { border-color: #814847; color: #ffb4ad; background: #3b2928; }

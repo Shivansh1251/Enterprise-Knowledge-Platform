@@ -115,6 +115,42 @@ function semanticUnavailableMessage() {
     return 'Apply the pgvector migration to enable semantic search.';
 }
 
+/** Search sources for a chat turn using the selected retrieval mode. */
+async function retrieveForChat(query, organizationId, mode = 'hybrid') {
+    const keywordResults = await searchKeywords(query, organizationId);
+    const keywordResponse = (degraded = false, message = '') => ({
+        retrievalMode: 'keyword',
+        degraded,
+        message,
+        results: keywordResults.slice(0, RESULT_LIMIT)
+            .map(({ lexicalScore, ...result }) => withCitation(result)),
+    });
+
+    if (mode === 'keyword') return keywordResponse(false, '');
+
+    const embeddingsReady = isEmbeddingConfigured() && await hasVectorStorage();
+    if (!embeddingsReady) return keywordResponse(true, `${semanticUnavailableMessage()} Showing keyword matches.`);
+
+    try {
+        if (mode === 'semantic') {
+            const results = (await searchSemantically(query, organizationId)).slice(0, RESULT_LIMIT)
+                .map((result) => withCitation(result));
+            return { retrievalMode: 'semantic', degraded: false, message: '', results };
+        }
+
+        const semanticResults = await searchSemantically(query, organizationId);
+        return {
+            retrievalMode: 'hybrid',
+            degraded: false,
+            message: '',
+            results: reciprocalRankFuse(keywordResults, semanticResults),
+        };
+    } catch (error) {
+        console.error('Chat source retrieval failed:', error.message);
+        return keywordResponse(true, 'Semantic retrieval is unavailable. Showing keyword matches.');
+    }
+}
+
 /** GET /search?q=query&mode=hybrid|semantic|keyword */
 const search = async (req, res, next) => {
     try {
@@ -185,4 +221,4 @@ const search = async (req, res, next) => {
     }
 };
 
-module.exports = { search };
+module.exports = { retrieveForChat, search };

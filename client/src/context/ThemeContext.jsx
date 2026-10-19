@@ -13,6 +13,7 @@ function getInitialTheme() {
 
 export function ThemeProvider({ children }) {
     const [theme, setTheme] = useState(getInitialTheme)
+    const [incognito, setIncognito] = useState(false)
 
     useEffect(() => {
         document.documentElement.dataset.theme = theme
@@ -23,7 +24,12 @@ export function ThemeProvider({ children }) {
         }
     }, [theme])
 
-    const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark')
+    useEffect(() => {
+        document.documentElement.dataset.incognito = incognito ? 'true' : 'false'
+    }, [incognito])
 
-    return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
+    const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark')
+    const toggleIncognito = () => setIncognito((current) => !current)
+
+    return <ThemeContext.Provider value={{ theme, toggleTheme, incognito, toggleIncognito }}>{children}</ThemeContext.Provider>
 }

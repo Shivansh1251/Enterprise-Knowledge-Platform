@@ -113,6 +113,7 @@ export default function AskPage() {
     const [searchMode, setSearchMode] = useState('hybrid')
     const [results, setResults] = useState([])
     const [searchInfo, setSearchInfo] = useState(null)
+    const [answer, setAnswer] = useState('')
     const [view, setView] = useState('landing')
     const [step, setStep] = useState(0)
     const [error, setError] = useState('')
@@ -159,6 +160,7 @@ export default function AskPage() {
         setError('')
         setSubmitted(cleanQuery)
         setSearchInfo(null)
+        setAnswer('')
         setResults([])
         setStep(0)
         setView('processing')
@@ -168,15 +170,16 @@ export default function AskPage() {
             const minAnimation = new Promise((resolve) => setTimeout(resolve, 850))
             stepTimer = setInterval(() => setStep((current) => Math.min(current + 1, 2)), 420)
             const [{ data }] = await Promise.all([
-                api.get('/search', { params: { q: cleanQuery, mode } }),
+                api.post('/chat', { query: cleanQuery, mode }),
                 minAnimation,
             ])
             setResults(Array.isArray(data.results) ? data.results : [])
+            setAnswer(typeof data.answer === 'string' ? data.answer : '')
             const resultCount = Array.isArray(data.results) ? data.results.length : 0
             toast({
-                title: resultCount ? `Found ${resultCount} ${resultCount === 1 ? 'source' : 'sources'}` : 'No matching sources found',
-                description: resultCount ? 'Hank found passages in your knowledge base.' : 'Try another question or add more documents.',
-                variant: resultCount ? 'success' : 'info',
+                title: 'Hank replied',
+                description: resultCount ? `Grounded with ${resultCount} ${resultCount === 1 ? 'source' : 'sources'}.` : 'No matching knowledge base passages were needed for this reply.',
+                variant: 'success',
             })
             setSearchInfo({ mode: data.retrievalMode || mode, degraded: Boolean(data.degraded), message: data.message || '' })
             setFilter('All')
@@ -193,11 +196,11 @@ export default function AskPage() {
 
     const linkedQuery = searchParams.get('q')
     useEffect(() => {
-        if (!linkedQuery?.trim()) return
+        if (!linkedQuery?.trim() || view !== 'landing') return
         // A query parameter is an external navigation event that should start a search.
         // oxlint-disable-next-line react/set-state-in-effect
         void runSearch(linkedQuery, 'hybrid')
-    }, [linkedQuery, runSearch])
+    }, [linkedQuery, runSearch, view])
 
     const handleSubmit = (event) => {
         event.preventDefault()
@@ -264,20 +267,20 @@ export default function AskPage() {
         : results.filter((result) => getFileType(result.documentName || result.citation?.documentName) === filter)
 
     if (view === 'processing') {
-        const steps = ['Reading your question', 'Searching your organization’s documents', 'Preparing source citations']
+        const steps = ['Understanding your message', 'Checking relevant documents', 'Writing a helpful reply']
         return (
             <section className="hank-processing" aria-live="polite">
                 <HankMark size={58} />
                 <div className="hank-processing-ticket"><span>YOUR QUESTION</span><strong>{submitted}</strong></div>
-                <h1>Searching your knowledge…</h1>
+                <h1>Hank is thinking…</h1>
                 <p className="hank-processing-copy">{steps[step]}</p>
                 <div className="hank-progress-count">{Math.min(step + 1, steps.length)} of {steps.length} steps</div>
                 <div className="hank-progress-track" aria-label={`${step + 1} of ${steps.length} steps complete`}>
                     {steps.map((label, index) => <span key={label} className={index <= step ? 'done' : ''} />)}
                 </div>
                 <div className="hank-consulting">
-                    <span>CONSULTING SOURCES</span>
-                    <p><LoaderCircle size={15} /> Searching your knowledge base…</p>
+                    <span>LOCAL ASSISTANT</span>
+                    <p><LoaderCircle size={15} /> Preparing a helpful reply…</p>
                 </div>
             </section>
         )
@@ -289,10 +292,14 @@ export default function AskPage() {
                 <header className="hank-results-header">
                     <div className="hank-results-heading">
                         <HankMark size={34} />
-                        <div><h1>Hank found {results.length} {results.length === 1 ? 'source' : 'sources'}</h1><p>For “{submitted}” · {searchInfo?.mode || searchMode} search</p></div>
+                        <div><h1>{results.length ? `Hank found ${results.length} ${results.length === 1 ? 'source' : 'sources'}` : 'Hank replied'}</h1><p>For “{submitted}”{results.length ? ` · ${searchInfo?.mode || searchMode} search` : ' · conversational reply'}</p></div>
                     </div>
                     <button type="button" className="hank-new-question" onClick={() => { setView('landing'); setError(''); setSelectedResult(null) }}><ArrowLeft size={15} /> <StaggeredText>Ask another question</StaggeredText></button>
                 </header>
+                {answer && <article className="hank-answer-card" aria-label="Hank’s reply">
+                    <div className="hank-answer-heading"><HankMark size={25} /><strong>Hank</strong></div>
+                    <p>{answer}</p>
+                </article>}
                 {searchInfo?.message && <div className={`hank-search-notice${searchInfo.degraded ? ' degraded' : ''}`}><AlertCircle size={15} />{searchInfo.message}</div>}
                 <div className="hank-results-toolbar">
                     <div className="hank-filter-tabs" role="group" aria-label="Filter source results">
@@ -304,7 +311,7 @@ export default function AskPage() {
                 {filteredResults.length ? (
                     <div className="hank-results-grid">{filteredResults.map((result, index) => <CitationCard key={result.chunkId || `${result.documentId}-${index}`} result={result} index={index} onOpen={setSelectedResult} />)}</div>
                 ) : (
-                    <div className="hank-empty-results"><Search size={23} /><h2>No matching passages found</h2><p>Try a different question, or add more documents to your knowledge base.</p><button type="button" onClick={() => { setView('landing'); setQuery('') }}><StaggeredText>Ask Hank another question</StaggeredText></button></div>
+                    <div className="hank-empty-results"><Search size={23} /><h2>No source passages</h2><p>{answer ? 'Hank answered conversationally without using knowledge base documents.' : 'Try a different question, or add more documents to your knowledge base.'}</p><button type="button" onClick={() => { setView('landing'); setQuery('') }}><StaggeredText>Ask Hank another question</StaggeredText></button></div>
                 )}
                 {selectedResult && <DetailDialog result={selectedResult} query={submitted} mode={searchInfo?.mode || searchMode} onClose={closeResult} />}
             </section>
@@ -315,7 +322,7 @@ export default function AskPage() {
         <section className="hank-landing">
             <div className="hank-hero-mark"><HankMark size={58} /></div>
             <h1>Ask Hank about your knowledge base</h1>
-            <p className="hank-hero-subtitle">Ask a question and Hank will find the most relevant passages in your organization’s documents.</p>
+            <p className="hank-hero-subtitle">Chat naturally or ask about your team’s knowledge. Hank replies and shows the document passages behind its answers.</p>
             <form className={`hank-composer${listening ? ' is-listening' : ''}`} onSubmit={handleSubmit} aria-busy={listening}>
                 <label className="sr-only" htmlFor="hank-question">Ask your knowledge base</label>
                 <textarea ref={questionRef} id="hank-question" aria-describedby="hank-enter-hint" value={query} onChange={(event) => { setQuery(event.target.value); setVoiceNotice('') }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit() } }} placeholder="Ask Hank anything…" maxLength={200} />

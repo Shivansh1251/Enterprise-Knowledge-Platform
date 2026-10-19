@@ -9,6 +9,7 @@ import api from '../lib/api'
 import HankMark from '../components/layout/HankMark'
 import StaggeredText from '../components/StaggeredText'
 import ThemeToggle from '../components/ThemeToggle'
+import IncognitoToggle from '../components/IncognitoToggle'
 import './AuthPage.css'
 
 function Field({ id, label, icon: Icon, children }) {
@@ -127,6 +128,7 @@ export default function AuthPage() {
                 </a>
                 <div className="auth-brandbar-actions">
                     <ThemeToggle className="auth-theme-toggle" />
+                    <IncognitoToggle />
                     <span className="auth-brandbar-note"><ShieldCheck size={14} /> Your workspace stays yours</span>
                 </div>
             </header>

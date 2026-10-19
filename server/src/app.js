@@ -9,6 +9,7 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
 const searchRoutes = require('./routes/search');
+const chatRoutes = require('./routes/chat');
 const { errorHandler } = require('./middleware/errorHandler');
 const prisma = require('./lib/prisma');
 
@@ -63,6 +64,7 @@ app.get('/ready', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/chat', chatRoutes);
 
 const clientDistPath = path.resolve(__dirname, '../../client/dist');
 if (process.env.NODE_ENV === 'production' && fs.existsSync(clientDistPath)) {

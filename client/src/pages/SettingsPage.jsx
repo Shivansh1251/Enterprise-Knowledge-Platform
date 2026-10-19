@@ -36,7 +36,7 @@ export default function SettingsPage() {
                     <div className="settings-card-heading"><span className="settings-card-icon security"><LockKeyhole size={17} /></span><span><strong>Search & privacy</strong><small>How your workspace data is used</small></span></div>
                     <div className="settings-privacy-item"><span><Check size={14} /></span><p>Search is scoped to documents in this organization.</p></div>
                     <div className="settings-privacy-item"><span><Check size={14} /></span><p>Each result links to its source passage so you can verify the context.</p></div>
-                    <p className="settings-privacy-note">When semantic search is configured, your query and document passages are sent to the configured embedding provider.</p>
+                    <p className="settings-privacy-note">Chat replies use the configured Ollama model in every mode. Incognito changes the page to a black-and-white appearance only; it does not change search or answer providers. Semantic and hybrid search may send the query and document passages to the configured embedding provider.</p>
                 </section>
             </div>
         </div>
